@@ -14,7 +14,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
+    --background: #d3d3d356;
     --foreground: #ededed;
   }
 }
@@ -23,4 +23,439 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* OnTheSpot responsive layout */
+
+.ots-layout {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  height: 100%;
+}
+
+.ots-list {
+  overflow-y: auto;
+  padding: 12px;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .ots-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: 50vh 1fr;
+  }
+
+  .ots-list {
+    border-right: none;
+    border-top: 1px solid rgba(0,0,0,0.1);
+  }
+}
+
+.ots-list a {
+  color: #00fffb; /* readable blue */
+}
+
+.ots-list button {
+  color: #111;
+}
+
+.ots-card {
+  background: white;
+  color: #111;
+}
+
+/* Shared white surface styling (cards/panels) */
+.ots-surface {
+  background: white;
+  color: #111; /* force readable text */
+}
+
+/* Surface variants */
+.ots-surface--shadow {
+  box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+  border-radius: 12px;
+}
+
+.ots-surface--border {
+  border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 12px;
+}
+
+.ots-surface a {
+  color: #ffb700;
+}
+
+/* Map center crosshair */
+.ots-crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  transform: translate(-50%, -50%);
+  pointer-events: none; /* important: don't block map interactions */
+  opacity: 0.9;
+}
+
+.ots-crosshair::before,
+.ots-crosshair::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  background: rgba(0, 0, 0, 0.85);
+  transform: translate(-50%, -50%);
+  border-radius: 2px;
+}
+
+/* vertical line */
+.ots-crosshair::before {
+  width: 2px;
+  height: 22px;
+}
+
+/* horizontal line */
+.ots-crosshair::after {
+  width: 22px;
+  height: 2px;
+}
+
+/* Crosshair pulse on settle */
+.ots-crosshair--pulse {
+  animation: otsCrosshairPulse 180ms ease-out;
+}
+
+@keyframes otsCrosshairPulse {
+  0%   { transform: translate(-50%, -50%) scale(1); }
+  50%  { transform: translate(-50%, -50%) scale(1.15); }
+  100% { transform: translate(-50%, -50%) scale(1); }
+}
+
+/* Ensure the main app can give children a real height */
+html, body {
+  height: 100%;
+}
+
+/* When in the home page flex column, allow the grid to shrink/grow correctly */
+.ots-layout {
+  min-height: 0; /* critical for nested flex/grid scrolling + map sizing */
+}
+
+/* Make the map column actually fill available height */
+.ots-map {
+  position: relative;
+  min-height: 0;
+  height: 100%;
+}
+
+/* Sticky header (mobile-first safe) */
+.ots-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+/* iOS Safari notch support (optional but good) */
+@supports (padding: env(safe-area-inset-top)) {
+  .ots-header {
+    padding-top: calc(10px + env(safe-area-inset-top));
+  }
+}
+
+/* Desktop controls visible by default */
+.ots-header-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+/* Hide mobile button on desktop */
+.ots-filters-btn {
+  display: none;
+  padding: 6px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,0.2);
+  background: white;
+  cursor: pointer;
+}
+
+/* Desktop controls shown, mobile button hidden */
+@media (max-width: 768px) {
+  .ots-header-controls {
+    display: none;
+  }
+  .ots-filters-btn {
+    display: inline-block;
+  }
+
+  .ots-sheet-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    z-index: 200;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 12px;
+  }
+
+  .ots-sheet {
+    width: min(560px, 100%);
+    background: white;
+    border-radius: 16px 16px 16px 16px;
+    border: 1px solid rgba(0,0,0,0.12);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+    padding: 12px 12px 16px;
+    max-height: 70vh;
+    overflow: auto;
+  }
+
+  .ots-sheet-handle {
+    width: 44px;
+    height: 5px;
+    border-radius: 999px;
+    background: rgba(0,0,0,0.2);
+    margin: 6px auto 10px;
+  }
+}
+
+.ots-sheet select,
+.ots-sheet input {
+  width: 100%;
+}
+
+@keyframes otsSheetUp {
+  from { transform: translateY(18px) scale(0.98); opacity: 0; }
+  to   { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+@keyframes otsOverlayFade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Admin dropdown (desktop) */
+.ots-admin-menu {
+  position: relative;
+}
+
+.ots-admin-summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,0.2);
+  background: white;
+  user-select: none;
+  font-weight: 700;
+  color: #111;
+}
+
+/* Hide default marker */
+.ots-admin-summary::-webkit-details-marker {
+  display: none;
+}
+
+.ots-admin-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  min-width: 160px;
+  background: white;
+  border: 1px solid rgba(0,0,0,0.12);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+  padding: 6px;
+  display: grid;
+  gap: 4px;
+  z-index: 80;
+}
+
+.ots-admin-item {
+  display: block;
+  padding: 10px 10px;
+  border-radius: 10px;
+  text-decoration: none;
+  color: #111;
+}
+
+.ots-admin-item:hover {
+  background: rgba(0,0,0,0.06);
+}
+
+/* AppShell shared UI */
+.ots-headerbar {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  background: white;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+
+.ots-shell {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 12px 16px;
+}
+
+.ots-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ots-brand-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #111;
+  line-height: 1.1;
+}
+
+.ots-brand-subtitle {
+  color: #333;
+  font-size: 13px;
+  line-height: 1.1;
+}
+
+.ots-h1 {
+  font-size: 22px;
+  font-weight: 800;
+  margin: 8px 0 12px;
+  color: #111;
+}
+
+.ots-link {
+  color: #0b57d0;
+  text-decoration: none;
+}
+
+.ots-link:hover {
+  text-decoration: underline;
+}
+
+.ots-btn {
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,0.2);
+  background: white;
+  cursor: pointer;
+  color: #111;
+  font-weight: 600;
+}
+
+.ots-select,
+.ots-input {
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,0.2);
+  background: white;
+  color: #111;
+}
+
+/* Shared page container used by AppShell */
+.ots-page {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.ots-page--full {
+  max-width: none;
+  padding: 0;
+  height: 100%;
+  min-height: 0;
+}
+
+/* Shared form + button styles removed as duplicated */
+
+/* .ots-map duplicate removed */
+
+/* Removed duplicate .ots-subtitle--admin */
+.ots-subtitle {
+  color: #333;
+}
+
+.ots-subtitle--admin {
+  color: #00fffb;
+  font-weight: 700;
+}
+
+/* Friend request action buttons */
+
+.ots-btn-accept,
+.ots-btn-reject {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px; /* pill shape */
+  font-weight: 700;
+  font-size: 13px;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.08s ease, box-shadow 0.08s ease, opacity 0.08s ease;
+}
+
+/* Accept button */
+.ots-btn-accept {
+  background: #2ecc71;
+  color: white;
+}
+
+.ots-btn-accept::before {
+  content: "✓";
+  font-weight: 900;
+}
+
+.ots-btn-accept:hover {
+  background: #27ae60;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.18);
+}
+
+/* Reject button */
+.ots-btn-reject {
+  background: #e74c3c;
+  color: white;
+}
+
+.ots-btn-reject::before {
+  content: "✕";
+  font-weight: 900;
+}
+
+.ots-btn-reject:hover {
+  background: #c0392b;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.18);
+}
+
+/* Slight press feedback */
+.ots-btn-accept:active,
+.ots-btn-reject:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+/* Friend request row fade-out (Account page) */
+.ots-row-fade-out {
+  opacity: 1;
+  transform: translateX(0);
+  transition: opacity 0.18s ease-out, transform 0.18s ease-out;
+  will-change: opacity, transform;
+}
+
+.ots-row-fade-out--accepted,
+.ots-row-fade-out--rejected {
+  opacity: 0;
+  transform: translateX(10px);
+  pointer-events: none;
+}
+
+/* Skeleton loading pulse (used by src/app/(protected)/loading.tsx) */
+@keyframes otsPulse {
+  0% { opacity: 0.55; }
+  50% { opacity: 1; }
+  100% { opacity: 0.55; }
 }

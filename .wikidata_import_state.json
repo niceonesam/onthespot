@@ -1,0 +1,10 @@
+{
+  "updated_at": "2026-02-26T10:30:30.477Z",
+  "limit": 200,
+  "last_offset": 0,
+  "next_offset": 200,
+  "total_prepared": 130,
+  "total_written": 130,
+  "dry_run": false,
+  "pace_ms": 200
+}
