@@ -26,10 +26,12 @@ export async function middleware(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
 
-  // Allow unauthenticated access to login + auth callbacks + static assets
+  // Allow unauthenticated access to login + auth pages + API routes + static assets
+  // (API routes should do their own auth checks where needed)
   const isPublic =
     path.startsWith("/login") ||
     path.startsWith("/auth") ||
+    path.startsWith("/api") ||
     path.startsWith("/_next") ||
     path.startsWith("/favicon.ico");
 
@@ -54,9 +56,10 @@ export const config = {
   matcher: [
     /*
       Protect everything except:
+      - API routes (handle auth inside route handlers)
       - Next.js internals
       - favicon
     */
-    "/((?!_next/static|_next/image|favicon.ico).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico).*)",
   ],
 };
