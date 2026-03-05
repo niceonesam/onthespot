@@ -2,6 +2,7 @@
 
 import AddSpotForm from "@/components/AddSpotForm";
 import { useRouter } from "next/navigation";
+import { Suspense } from "react";
 
 export default function AddSpotModalPage() {
   const router = useRouter();
@@ -44,7 +45,9 @@ export default function AddSpotModalPage() {
           </button>
         </div>
 
-        <AddSpotForm />
+        <Suspense fallback={<div style={{ padding: 16 }}>Loading…</div>}>
+          <AddSpotForm />
+        </Suspense>
       </div>
     </div>
   );
