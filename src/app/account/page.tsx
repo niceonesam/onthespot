@@ -55,7 +55,13 @@ export default function AccountPage() {
   const [msg, setMsg] = useState<string | null>(null);
 
   const [addEmail, setAddEmail] = useState("");
-  const [busy, setBusy] = useState(false);
+  
+  // Per-action busy flags (avoid one global "busy" disabling unrelated UI)
+  const [sendingFriendRequest, setSendingFriendRequest] = useState(false);
+  const [creatingGroup, setCreatingGroup] = useState(false);
+  const [joiningGroup, setJoiningGroup] = useState(false);
+  const [addingGroupMember, setAddingGroupMember] = useState(false);
+  const [removingFriendId, setRemovingFriendId] = useState<string | null>(null);
 
   // Groups
   const [groups, setGroups] = useState<MyGroup[]>([]);
@@ -66,6 +72,21 @@ export default function AccountPage() {
   const [addMemberId, setAddMemberId] = useState<string>("");
   // User labels (resolve user_id -> email / name for nicer UI)
   const [userLabels, setUserLabels] = useState<Record<string, string>>({});
+  const userLabelsRef = useRef<Record<string, string>>({});
+  const labelsInFlightRef = useRef(false);
+
+  function isErrorText(t: string) {
+    const s = t.toLowerCase();
+    return (
+      s.includes("error") ||
+      s.includes("failed") ||
+      s.includes("unauthorized") ||
+      s.includes("forbidden") ||
+      (s.includes("not") && s.includes("allowed")) ||
+      s.includes("denied") ||
+      s.includes("invalid")
+    );
+  }
   const [labelsStatus, setLabelsStatus] = useState<string | null>(null);
 
   // Animate incoming requests out before we update/remove them
@@ -74,8 +95,125 @@ export default function AccountPage() {
   >({});
   const animTimersRef = useRef<Record<string, any>>({});
 
+  const [replayBusy, setReplayBusy] = useState(false);
+  const [replayMsg, setReplayMsg] = useState<string | null>(null);
+
   function rowKey(r: Pick<FriendRow, "requester_id" | "addressee_id">) {
     return `${r.requester_id}->${r.addressee_id}`;
+  }
+
+  async function loadProfile(uid: string) {
+    // Load my profile display name and avatar
+    const { data: prof, error: profErr } = await supabase
+      .from("profiles")
+      .select("display_name, avatar_url, avatar_path")
+      .eq("id", uid)
+      .maybeSingle();
+
+    if (profErr) {
+      setMsg((prev) => prev ?? profErr.message);
+      setDisplayName("");
+      setAvatarUrl(null);
+      setAvatarPath(null);
+      return;
+    }
+
+    setDisplayName(String((prof as any)?.display_name ?? ""));
+    const aPath =
+      ((prof as any)?.avatar_path as string | null | undefined) ?? null;
+    setAvatarPath(aPath);
+
+    // Private bucket: generate a short-lived signed URL for display
+    if (aPath) {
+      const { data: signed, error: signedErr } = await supabase.storage
+        .from("avatars")
+        .createSignedUrl(aPath, 60 * 60); // 1 hour
+
+      if (signedErr) {
+        setMsg((prev) => prev ?? signedErr.message);
+        setAvatarUrl(null);
+      } else {
+        setAvatarUrl(signed?.signedUrl ?? null);
+      }
+    } else {
+      setAvatarUrl(null);
+    }
+  }
+
+  async function loadGroups(uid: string) {
+    setLoadingGroups(true);
+
+    const { data: gm, error: gmError } = await supabase
+      .from("group_members")
+      .select("group_id, user_id, role, created_at")
+      .eq("user_id", uid)
+      .order("created_at", { ascending: false });
+
+    if (gmError) {
+      setMsg((prev) => prev ?? gmError.message);
+      setGroups([]);
+      setLoadingGroups(false);
+      return;
+    }
+
+    const groupIds = Array.from(
+      new Set((gm ?? []).map((r: any) => String(r.group_id)).filter(Boolean)),
+    );
+
+    const groupsById = new Map<string, { id: string; name: string; owner_id: string }>();
+
+    if (groupIds.length > 0) {
+      const { data: gRows, error: gErr } = await supabase
+        .from("groups")
+        .select("id, name, owner_id")
+        .in("id", groupIds);
+
+      if (gErr) {
+        setMsg((prev) => prev ?? gErr.message);
+      } else {
+        (gRows ?? []).forEach((g: any) => {
+          const id = String(g.id);
+          groupsById.set(id, {
+            id,
+            name: String(g.name ?? "(unnamed)"),
+            owner_id: String(g.owner_id ?? ""),
+          });
+        });
+      }
+    }
+
+    const mapped: MyGroup[] = (gm ?? [])
+      .map((r: any) => {
+        const gid = String(r.group_id);
+        const g = groupsById.get(gid);
+        return {
+          id: gid,
+          name: g?.name ?? "(unnamed)",
+          owner_id: g?.owner_id ?? "",
+          my_role: String(r.role ?? "member"),
+        };
+      })
+      .filter((g, i, arr) => arr.findIndex((x) => x.id === g.id) === i);
+
+    setGroups(mapped);
+
+    // Ensure selectedGroupId stays valid
+    if (!mapped.some((g) => g.id === selectedGroupId)) {
+      setSelectedGroupId(mapped.length > 0 ? mapped[0].id : null);
+    }
+
+    setLoadingGroups(false);
+  }
+
+  async function loadFriends(uid: string) {
+    const { data, error } = await supabase
+      .from("friends")
+      .select("requester_id, addressee_id, status, created_at, updated_at")
+      .or(`requester_id.eq.${uid},addressee_id.eq.${uid}`)
+      .order("updated_at", { ascending: false });
+
+    if (error) setMsg((prev) => prev ?? error.message);
+    setRows((data ?? []) as FriendRow[]);
   }
 
   async function load() {
@@ -84,129 +222,35 @@ export default function AccountPage() {
 
     const { data: s } = await supabase.auth.getSession();
     const u = s.session?.user;
+
     if (!u) {
-        setUserId(null);
-        setEmail(null);
-        setDisplayName("");
-        setAvatarUrl(null);
-        setAvatarPath(null);
-        setAvatarFile(null);
-        setAvatarMsg(null);
-        setRows([]);
-        setLoading(false);
-        return;
+      setUserId(null);
+      setEmail(null);
+      setDisplayName("");
+      setAvatarUrl(null);
+      setAvatarPath(null);
+      setAvatarFile(null);
+      setAvatarMsg(null);
+      setRows([]);
+      setGroups([]);
+      setSelectedGroupId(null);
+      setLoadingGroups(false);
+      setLabelsStatus(null);
+      setReplayMsg(null);
+      setUserLabels({});
+      userLabelsRef.current = {};
+      setLoading(false);
+      return;
     }
 
     setUserId(u.id);
     setEmail(u.email ?? null);
 
-    // Load my profile display name and avatar
-    const { data: prof, error: profErr } = await supabase
-      .from("profiles")
-      .select("display_name, avatar_url, avatar_path")
-      .eq("id", u.id)
-      .maybeSingle();
-
-    if (profErr) {
-      // Non-fatal; page still works
-      setMsg((prev) => prev ?? profErr.message);
-      setDisplayName("");
-      setAvatarUrl(null);
-      setAvatarPath(null);
-    } else {
-      setDisplayName(String((prof as any)?.display_name ?? ""));
-      const aPath = ((prof as any)?.avatar_path as string | null | undefined) ?? null;
-      setAvatarPath(aPath);
-
-      // Private bucket: generate a short-lived signed URL for display
-      if (aPath) {
-        const { data: signed, error: signedErr } = await supabase.storage
-          .from("avatars")
-          .createSignedUrl(aPath, 60 * 60); // 1 hour
-
-        if (signedErr) {
-          setMsg((prev) => prev ?? signedErr.message);
-          setAvatarUrl(null);
-        } else {
-          setAvatarUrl(signed?.signedUrl ?? null);
-        }
-      } else {
-        setAvatarUrl(null);
-      }
+    try {
+      await Promise.all([loadProfile(u.id), loadGroups(u.id), loadFriends(u.id)]);
+    } finally {
+      setLoading(false);
     }
-
-    // Load my groups via memberships (two-step to avoid PostgREST embed issues)
-    setLoadingGroups(true);
-
-    const { data: gm, error: gmError } = await supabase
-      .from("group_members")
-      .select("group_id, user_id, role, created_at")
-      .eq("user_id", u.id)
-      .order("created_at", { ascending: false });
-
-    if (gmError) {
-      // Don't fail the whole page; just show a message
-      setMsg((prev) => prev ?? gmError.message);
-      setGroups([]);
-    } else {
-      const groupIds = Array.from(
-        new Set((gm ?? []).map((r: any) => String(r.group_id)).filter(Boolean))
-      );
-
-      let groupsById = new Map<string, { id: string; name: string; owner_id: string }>();
-
-      if (groupIds.length > 0) {
-        const { data: gRows, error: gErr } = await supabase
-          .from("groups")
-          .select("id, name, owner_id")
-          .in("id", groupIds);
-
-        if (gErr) {
-          setMsg((prev) => prev ?? gErr.message);
-        } else {
-          (gRows ?? []).forEach((g: any) => {
-            const id = String(g.id);
-            groupsById.set(id, {
-              id,
-              name: String(g.name ?? "(unnamed)"),
-              owner_id: String(g.owner_id ?? ""),
-            });
-          });
-        }
-      }
-
-      const mapped: MyGroup[] = (gm ?? [])
-        .map((r: any) => {
-          const gid = String(r.group_id);
-          const g = groupsById.get(gid);
-          return {
-            id: gid,
-            name: g?.name ?? "(unnamed)",
-            owner_id: g?.owner_id ?? "",
-            my_role: String(r.role ?? "member"),
-          };
-        })
-        // de-dupe by group id (defensive)
-        .filter((g, i, arr) => arr.findIndex((x) => x.id === g.id) === i);
-
-      setGroups(mapped);
-      // Default selected group
-      if (!selectedGroupId && mapped.length > 0) {
-        setSelectedGroupId(mapped[0].id);
-      }
-    }
-
-    setLoadingGroups(false);
-
-    const { data, error } = await supabase
-      .from("friends")
-      .select("requester_id, addressee_id, status, created_at, updated_at")
-      .or(`requester_id.eq.${u.id},addressee_id.eq.${u.id}`)
-      .order("updated_at", { ascending: false });
-
-    if (error) setMsg(error.message);
-    setRows((data ?? []) as FriendRow[]);
-    setLoading(false);
   }
 
   useEffect(() => {
@@ -232,29 +276,34 @@ export default function AccountPage() {
     const ids: string[] = [];
 
     rows.forEach((r) => {
-        ids.push(r.requester_id);
-        ids.push(r.addressee_id);
+      ids.push(r.requester_id);
+      ids.push(r.addressee_id);
     });
 
     groups.forEach((g) => {
-        if (g.owner_id) ids.push(g.owner_id);
+      if (g.owner_id) ids.push(g.owner_id);
     });
 
     if (userId) ids.push(userId);
 
-    resolveUserLabels(ids);
+    void resolveUserLabels(ids);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [rows, groups, userId]);
+  }, [rows, groups, userId]);
 
   const incoming = useMemo(
-    () => rows.filter((r) => r.addressee_id === userId && r.status === "pending"),
-    [rows, userId]
+    () =>
+      rows.filter((r) => r.addressee_id === userId && r.status === "pending"),
+    [rows, userId],
   );
   const outgoing = useMemo(
-    () => rows.filter((r) => r.requester_id === userId && r.status === "pending"),
-    [rows, userId]
+    () =>
+      rows.filter((r) => r.requester_id === userId && r.status === "pending"),
+    [rows, userId],
   );
-  const friends = useMemo(() => rows.filter((r) => r.status === "accepted"), [rows]);
+  const friends = useMemo(
+    () => rows.filter((r) => r.status === "accepted"),
+    [rows],
+  );
 
   function otherId(r: FriendRow) {
     return r.requester_id === userId ? r.addressee_id : r.requester_id;
@@ -267,92 +316,103 @@ export default function AccountPage() {
 
   function userLabel(id: string) {
     return userLabels[id] ?? prettyId(id);
-        }
+  }
 
-        async function resolveUserLabels(ids: string[]) {
-        const uniq = Array.from(new Set(ids.filter(Boolean)));
-        if (uniq.length === 0) return;
+  async function resolveUserLabels(ids: string[]) {
+    const uniq = Array.from(new Set(ids.filter(Boolean)));
+    if (uniq.length === 0) return;
 
-        // only fetch ids we don't already have
-        const missing = uniq.filter((id) => !userLabels[id]);
-        if (missing.length === 0) return;
+    // Only fetch ids we don't already have (use ref to avoid stale closures)
+    const existing = userLabelsRef.current;
+    const missing = uniq.filter((id) => !existing[id]);
+    if (missing.length === 0) return;
 
+    // Avoid overlapping requests if state updates rapidly
+    if (labelsInFlightRef.current) return;
+    labelsInFlightRef.current = true;
+
+    try {
+      setLabelsStatus(null);
+
+      const res = await fetch(
+        `/api/user-lookup?ids=${encodeURIComponent(missing.join(","))}`,
+        { cache: "no-store" }
+      );
+
+      const raw = await res.text().catch(() => "");
+      let j: any = null;
+      if (raw) {
         try {
-            setLabelsStatus(null);
-
-            const res = await fetch(
-            `/api/user-lookup?ids=${encodeURIComponent(missing.join(","))}`,
-            { cache: "no-store" }
-            );
-
-            const raw = await res.text().catch(() => "");
-            let j: any = null;
-            if (raw) {
-            try {
-                j = JSON.parse(raw);
-            } catch {
-                j = null;
-            }
-            }
-
-            if (!res.ok) {
-            setLabelsStatus(`Label lookup failed (${res.status})`);
-            return;
-            }
-
-            // Accept: { map: { [id]: "label" } } OR { users: [{id,email,display_name}] }
-            const next: Record<string, string> = {};
-
-            if (j?.map && typeof j.map === "object") {
-            Object.entries(j.map).forEach(([id, label]) => {
-                if (typeof label === "string" && label.trim()) next[id] = label;
-            });
-            } else if (Array.isArray(j?.users)) {
-            j.users.forEach((u: any) => {
-                const id = String(u?.id ?? "");
-                const label =
-                String(u?.display_name ?? "").trim() ||
-                String(u?.email ?? "").trim() ||
-                "";
-                if (id && label) next[id] = label;
-            });
-            }
-
-            if (Object.keys(next).length) {
-            setUserLabels((prev) => ({ ...prev, ...next }));
-            }
-        } catch (e: any) {
-            setLabelsStatus(`Label lookup error: ${e?.message ?? String(e)}`);
+          j = JSON.parse(raw);
+        } catch {
+          j = null;
         }
-    }
+      }
 
-    async function saveDisplayName() {
-    if (!userId) {
-        setMsg("Please sign in first.");
+      if (!res.ok) {
+        setLabelsStatus(`Label lookup failed (${res.status})`);
         return;
+      }
+
+      // Accept: { map: { [id]: "label" } } OR { users: [{id,email,display_name}] }
+      const next: Record<string, string> = {};
+
+      if (j?.map && typeof j.map === "object") {
+        Object.entries(j.map).forEach(([id, label]) => {
+          if (typeof label === "string" && label.trim()) next[id] = label;
+        });
+      } else if (Array.isArray(j?.users)) {
+        j.users.forEach((u: any) => {
+          const id = String(u?.id ?? "");
+          const label =
+            String(u?.display_name ?? "").trim() ||
+            String(u?.email ?? "").trim() ||
+            "";
+          if (id && label) next[id] = label;
+        });
+      }
+
+      if (Object.keys(next).length) {
+        setUserLabels((prev) => {
+          const merged = { ...prev, ...next };
+          userLabelsRef.current = merged;
+          return merged;
+        });
+      }
+    } catch (e: any) {
+      setLabelsStatus(`Label lookup error: ${e?.message ?? String(e)}`);
+    } finally {
+      labelsInFlightRef.current = false;
+    }
+  }
+
+  async function saveDisplayName() {
+    if (!userId) {
+      setMsg("Please sign in first.");
+      return;
     }
 
     setSavingName(true);
     setMsg(null);
 
     try {
-        const next = displayName.trim();
+      const next = displayName.trim();
 
-        const { error } = await supabase
+      const { error } = await supabase
         .from("profiles")
         .update({ display_name: next ? next : null })
         .eq("id", userId);
 
-        if (error) {
+      if (error) {
         setMsg(error.message);
         return;
-        }
+      }
 
-        setMsg("Saved ✅");
+      setMsg("Saved ✅");
     } finally {
-        setSavingName(false);
+      setSavingName(false);
     }
-    }
+  }
 
   async function uploadProfilePhoto() {
     if (!userId) {
@@ -385,7 +445,7 @@ export default function AccountPage() {
       if (up.error) {
         console.warn("Avatar upload error:", up.error);
         setAvatarMsg(
-          `${up.error.message}.\n\nCommon causes:\n- Storage bucket "avatars" doesn't exist (name must match exactly)\n- Bucket blocks this file type/size\n- Storage policies deny uploads`
+          `${up.error.message}.\n\nCommon causes:\n- Storage bucket "avatars" doesn't exist (name must match exactly)\n- Bucket blocks this file type/size\n- Storage policies deny uploads`,
         );
         return;
       }
@@ -439,11 +499,11 @@ export default function AccountPage() {
     const targetEmail = addEmail.trim().toLowerCase();
     if (!targetEmail) return;
 
-    setBusy(true);
+    setSendingFriendRequest(true);
     try {
       const res = await fetch(
         `/api/user-lookup?email=${encodeURIComponent(targetEmail)}`,
-        { cache: "no-store" }
+        { cache: "no-store" },
       );
 
       // Some errors (404/405/500) may return HTML or an empty body; don't assume JSON.
@@ -464,7 +524,7 @@ export default function AccountPage() {
         }
         if (res.status === 405) {
           setMsg(
-            "User lookup route exists but does not allow GET (405). Ensure src/app/api/user-lookup/route.ts exports GET."
+            "User lookup route exists but does not allow GET (405). Ensure src/app/api/user-lookup/route.ts exports GET.",
           );
           return;
         }
@@ -475,7 +535,7 @@ export default function AccountPage() {
         setMsg(
           raw
             ? `Lookup failed (${res.status}): ${raw.slice(0, 120)}`
-            : `Lookup failed (${res.status})`
+            : `Lookup failed (${res.status})`,
         );
         return;
       }
@@ -494,7 +554,7 @@ export default function AccountPage() {
       const existing = rows.find(
         (r) =>
           (r.requester_id === userId && r.addressee_id === targetId) ||
-          (r.requester_id === targetId && r.addressee_id === userId)
+          (r.requester_id === targetId && r.addressee_id === userId),
       );
 
       if (existing) {
@@ -508,14 +568,14 @@ export default function AccountPage() {
             return;
           } else {
             setMsg(
-              "They already sent you a friend request — check Incoming requests to accept it."
+              "They already sent you a friend request — check Incoming requests to accept it.",
             );
             return;
           }
         }
         // rejected (or other)
         setMsg(
-          "You already have a previous request with this user. Try removing it first, then resend."
+          "You already have a previous request with this user. Try removing it first, then resend.",
         );
         return;
       }
@@ -532,7 +592,7 @@ export default function AccountPage() {
           (error as any)?.code === "23505"
         ) {
           setMsg(
-            "You already have a friend request with this user (pending or accepted)."
+            "You already have a friend request with this user (pending or accepted).",
           );
         } else {
           setMsg(error.message);
@@ -543,7 +603,7 @@ export default function AccountPage() {
       setAddEmail("");
       await load();
     } finally {
-      setBusy(false);
+      setSendingFriendRequest(false);
     }
   }
 
@@ -585,8 +645,8 @@ export default function AccountPage() {
           r.addressee_id === userId &&
           r.status === "pending"
             ? { ...r, status: "accepted" }
-            : r
-        )
+            : r,
+        ),
       );
       setAnimatingOut((prev) => {
         const copy = { ...prev };
@@ -636,8 +696,8 @@ export default function AccountPage() {
               r.requester_id === requesterId &&
               r.addressee_id === userId &&
               r.status === "pending"
-            )
-        )
+            ),
+        ),
       );
       setAnimatingOut((prev) => {
         const copy = { ...prev };
@@ -650,20 +710,21 @@ export default function AccountPage() {
 
   async function removeFriend(other: string) {
     if (!userId) return;
-    setBusy(true);
+    setRemovingFriendId(other);
     setMsg(null);
+
     try {
       const { error } = await supabase
         .from("friends")
         .delete()
         .or(
-          `and(requester_id.eq.${userId},addressee_id.eq.${other}),and(requester_id.eq.${other},addressee_id.eq.${userId})`
+          `and(requester_id.eq.${userId},addressee_id.eq.${other}),and(requester_id.eq.${other},addressee_id.eq.${userId})`,
         );
 
       if (error) setMsg(error.message);
       await load();
     } finally {
-      setBusy(false);
+      setRemovingFriendId(null);
     }
   }
 
@@ -675,7 +736,7 @@ export default function AccountPage() {
     const name = groupName.trim();
     if (!name) return;
 
-    setBusy(true);
+    setCreatingGroup(true);
     setMsg(null);
     try {
       const { data, error } = await supabase
@@ -709,7 +770,7 @@ export default function AccountPage() {
       await load();
       setSelectedGroupId(gid);
     } finally {
-      setBusy(false);
+      setCreatingGroup(false);
     }
   }
 
@@ -721,7 +782,7 @@ export default function AccountPage() {
     const gid = joinGroupId.trim();
     if (!gid) return;
 
-    setBusy(true);
+    setJoiningGroup(true);
     setMsg(null);
     try {
       const { error } = await supabase
@@ -729,7 +790,10 @@ export default function AccountPage() {
         .insert({ group_id: gid, user_id: userId, role: "member" });
 
       if (error) {
-        if ((error as any)?.code === "23505" || error.message.toLowerCase().includes("duplicate")) {
+        if (
+          (error as any)?.code === "23505" ||
+          error.message.toLowerCase().includes("duplicate")
+        ) {
           setMsg("You are already a member of that group.");
         } else {
           setMsg(error.message);
@@ -741,7 +805,7 @@ export default function AccountPage() {
       await load();
       setSelectedGroupId(gid);
     } finally {
-      setBusy(false);
+      setJoiningGroup(false);
     }
   }
 
@@ -757,15 +821,22 @@ export default function AccountPage() {
     const memberId = addMemberId.trim();
     if (!memberId) return;
 
-    setBusy(true);
+    setAddingGroupMember(true);
     setMsg(null);
     try {
       const { error } = await supabase
         .from("group_members")
-        .insert({ group_id: selectedGroupId, user_id: memberId, role: "member" });
+        .insert({
+          group_id: selectedGroupId,
+          user_id: memberId,
+          role: "member",
+        });
 
       if (error) {
-        if ((error as any)?.code === "23505" || error.message.toLowerCase().includes("duplicate")) {
+        if (
+          (error as any)?.code === "23505" ||
+          error.message.toLowerCase().includes("duplicate")
+        ) {
           setMsg("That user is already in the group.");
         } else {
           setMsg(error.message);
@@ -776,135 +847,269 @@ export default function AccountPage() {
       setAddMemberId("");
       await load();
     } finally {
-      setBusy(false);
+      setAddingGroupMember(false);
+    }
+  }
+
+  async function replayOnboarding() {
+    setReplayMsg(null);
+    setReplayBusy(true);
+
+    try {
+      const { data: userData, error: userErr } = await supabase.auth.getUser();
+      const uid = userData?.user?.id;
+
+      if (userErr || !uid) {
+        setReplayMsg("You need to be logged in to replay the tour.");
+        return;
+      }
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          onboarding_version: 0,
+          onboarding_seen_at: null,
+        })
+        .eq("id", uid);
+
+      if (error) {
+        setReplayMsg(error.message);
+        return;
+      }
+
+      setReplayMsg("Tour reset — opening the home page…");
+      window.location.href = "/";
+    } finally {
+      setReplayBusy(false);
     }
   }
 
   return (
     <AppShell title="Account" subtitle="Friends & settings">
       <div style={{ padding: 16, display: "grid", gap: 16 }}>
-        <div className="ots-surface ots-surface--border" style={{ padding: 12 }}>
+        {msg && (
+          <div
+            role={isErrorText(msg) ? "alert" : "status"}
+            className="ots-surface ots-surface--border"
+            style={{
+              padding: 12,
+              borderColor: isErrorText(msg) ? "rgba(220, 38, 38, 0.30)" : "rgba(0,0,0,0.10)",
+              background: isErrorText(msg) ? "rgba(220, 38, 38, 0.08)" : "rgba(0,255,251,0.08)",
+              color: "#111",
+              fontWeight: 650,
+              whiteSpace: "pre-wrap",
+            }}
+          >
+            {msg}
+          </div>
+        )}
+        <div
+          className="ots-surface ots-surface--border"
+          style={{ padding: 12 }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <strong>Signed in as</strong>
-            <div style={{ marginTop: 6, opacity: 0.85 }}>{email ?? "(not signed in)"}</div>
+            <form action="/auth/logout" method="post">
+              <button type="submit" className="ots-btn" disabled={!userId}>
+                Log out
+              </button>
+            </form>
+          </div>
+          <div style={{ marginTop: 6, opacity: 0.85 }}>{email ?? "(not signed in)"}</div>
 
-            {/* Profile photo */}
-            <div style={{ marginTop: 12, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          {/* Profile photo */}
+          <div
+            style={{
+              marginTop: 12,
+              display: "flex",
+              gap: 12,
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
+          >
+            <div
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 999,
+                border: "1px solid rgba(0,0,0,0.15)",
+                background: "#f3f4f6",
+                overflow: "hidden",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontWeight: 800,
+                color: "#111",
+              }}
+              title={avatarUrl ? "Profile photo" : "No photo yet"}
+            >
+              {avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={avatarUrl}
+                  alt="Profile"
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              ) : (
+                <span style={{ fontSize: 14 }}>
+                  {(displayName || email || "?")
+                    .trim()
+                    .slice(0, 1)
+                    .toUpperCase()}
+                </span>
+              )}
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gap: 8,
+                minWidth: 260,
+                maxWidth: 520,
+                flex: "1 1 320px",
+              }}
+            >
+              <div style={{ fontSize: 13, color: "#333" }}>Profile picture</div>
+              <input
+                type="file"
+                accept="image/*"
+                disabled={!userId}
+                onChange={(e) => setAvatarFile(e.target.files?.[0] ?? null)}
+                style={{
+                  padding: 10,
+                  borderRadius: 12,
+                  border: "1px solid rgba(0,0,0,0.2)",
+                  background: "white",
+                }}
+              />
               <div
                 style={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: 999,
-                  border: "1px solid rgba(0,0,0,0.15)",
-                  background: "#f3f4f6",
-                  overflow: "hidden",
                   display: "flex",
+                  gap: 10,
                   alignItems: "center",
-                  justifyContent: "center",
-                  fontWeight: 800,
-                  color: "#111",
+                  flexWrap: "wrap",
                 }}
-                title={avatarUrl ? "Profile photo" : "No photo yet"}
               >
-                {avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={avatarUrl}
-                    alt="Profile"
-                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                  />
-                ) : (
-                  <span style={{ fontSize: 14 }}>
-                    {(displayName || email || "?").trim().slice(0, 1).toUpperCase()}
-                  </span>
-                )}
-              </div>
-
-              <div style={{ display: "grid", gap: 8, minWidth: 260, maxWidth: 520, flex: "1 1 320px" }}>
-                <div style={{ fontSize: 13, color: "#333" }}>Profile picture</div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  disabled={!userId}
-                  onChange={(e) => setAvatarFile(e.target.files?.[0] ?? null)}
-                  style={{
-                    padding: 10,
-                    borderRadius: 12,
-                    border: "1px solid rgba(0,0,0,0.2)",
-                    background: "white",
-                  }}
-                />
-                <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                  <button
-                    type="button"
-                    onClick={uploadProfilePhoto}
-                    disabled={!userId || uploadingAvatar || !avatarFile}
-                    style={{
-                      padding: "10px 12px",
-                      borderRadius: 12,
-                      border: "1px solid rgba(0,0,0,0.2)",
-                      background: "white",
-                      cursor: "pointer",
-                      fontWeight: 700,
-                    }}
-                  >
-                    {uploadingAvatar ? "Uploading…" : "Upload"}
-                  </button>
-                  <span style={{ fontSize: 12, opacity: 0.7 }}>
-                    JPG/PNG recommended. Stored privately in Supabase Storage (signed URL preview).
-                  </span>
-                </div>
-                {avatarMsg ? (
-                  <div style={{ marginTop: 6, color: avatarMsg.includes("✅") ? "#111" : "crimson", whiteSpace: "pre-wrap" }}>
-                    {avatarMsg}
-                  </div>
-                ) : null}
-              </div>
-            </div>
-
-            <div style={{ marginTop: 12, display: "grid", gap: 10, maxWidth: 520 }}>
-                <label style={{ display: "grid", gap: 6 }}>
-                <span style={{ fontSize: 13, color: "#333" }}>Display name</span>
-                <input
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="e.g. Sam"
-                    maxLength={60}
-                    disabled={!userId}
-                    style={{
-                    padding: 10,
-                    borderRadius: 12,
-                    border: "1px solid rgba(0,0,0,0.2)",
-                    }}
-                />
-                </label>
-
-                <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                 <button
-                    type="button"
-                    onClick={saveDisplayName}
-                    disabled={!userId || savingName}
-                    style={{
-                    padding: "10px 12px",
-                    borderRadius: 12,
-                    border: "1px solid rgba(0,0,0,0.2)",
-                    background: "white",
-                    cursor: "pointer",
-                    fontWeight: 700,
-                    }}
+                  type="button"
+                  onClick={uploadProfilePhoto}
+                  className="ots-btn"
+                  disabled={!userId || uploadingAvatar || !avatarFile}
                 >
-                    {savingName ? "Saving…" : "Save"}
+                  {uploadingAvatar ? "Uploading…" : "Upload"}
                 </button>
-
                 <span style={{ fontSize: 12, opacity: 0.7 }}>
-                    This name is shown to friends/groups (fallback is email).
+                  JPG/PNG recommended. Stored privately in Supabase Storage
+                  (signed URL preview).
                 </span>
+              </div>
+              {avatarMsg ? (
+                <div
+                  style={{
+                    marginTop: 6,
+                    color: avatarMsg.includes("✅") ? "#111" : "crimson",
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
+                  {avatarMsg}
                 </div>
+              ) : null}
             </div>
-            </div>
+          </div>
 
-        <div className="ots-surface ots-surface--border" style={{ padding: 12 }}>
+          <div
+            style={{ marginTop: 12, display: "grid", gap: 10, maxWidth: 520 }}
+          >
+            <label style={{ display: "grid", gap: 6 }}>
+              <span style={{ fontSize: 13, color: "#333" }}>Display name</span>
+              <input
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="e.g. Sam"
+                maxLength={60}
+                disabled={!userId}
+                style={{
+                  padding: 10,
+                  borderRadius: 12,
+                  border: "1px solid rgba(0,0,0,0.2)",
+                }}
+              />
+            </label>
+
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                alignItems: "center",
+                flexWrap: "wrap",
+              }}
+            >
+              <button
+                type="button"
+                onClick={saveDisplayName}
+                className="ots-btn"
+                disabled={!userId || savingName}
+              >
+                {savingName ? "Saving…" : "Save"}
+              </button>
+
+              <span style={{ fontSize: 12, opacity: 0.7 }}>
+                This name is shown to friends/groups (fallback is email).
+              </span>
+            </div>
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <button
+              type="button"
+              className="ots-btn"
+              onClick={replayOnboarding}
+              disabled={replayBusy}
+              style={{
+                background:
+                  "linear-gradient(180deg, rgba(0,255,251,0.16), rgba(0,255,251,0.06))",
+                fontWeight: 800,
+              }}
+            >
+              {replayBusy ? "Resetting…" : "Replay welcome tour"}
+            </button>
+
+            {replayMsg && (
+              <div
+                role="status"
+                style={{
+                  marginTop: 10,
+                  background: "rgba(0,255,251,0.10)",
+                  border: "1px solid rgba(0,0,0,0.08)",
+                  padding: 12,
+                  borderRadius: 12,
+                  color: "#333",
+                  fontWeight: 600,
+                  whiteSpace: "pre-wrap",
+                }}
+              >
+                {replayMsg}
+              </div>
+            )}
+
+            <div style={{ marginTop: 6, fontSize: 12, color: "#666" }}>
+              This resets the intro tour across all devices.
+            </div>
+          </div>
+        </div>
+
+        <div
+          className="ots-surface ots-surface--border"
+          style={{ padding: 12 }}
+        >
           <strong>Add a friend</strong>
-          <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <div
+            style={{
+              marginTop: 10,
+              display: "flex",
+              gap: 10,
+              flexWrap: "wrap",
+            }}
+          >
             <input
               value={addEmail}
               onChange={(e) => setAddEmail(e.target.value)}
@@ -919,33 +1124,36 @@ export default function AccountPage() {
             <button
               type="button"
               onClick={sendRequestByEmail}
-              disabled={busy || !userId}
-              style={{
-                padding: "10px 12px",
-                borderRadius: 12,
-                border: "1px solid rgba(0,0,0,0.2)",
-                background: "white",
-                cursor: "pointer",
-                fontWeight: 700,
-              }}
+              className="ots-btn"
+              disabled={sendingFriendRequest || !userId}
             >
               Send request
             </button>
           </div>
-          {msg ? <div style={{ marginTop: 10, color: "crimson" }}>{msg}</div> : null}
+          
           {labelsStatus ? (
             <div style={{ marginTop: 8, fontSize: 12, opacity: 0.65 }}>
-                {labelsStatus}
+              {labelsStatus}
             </div>
-            ) : null}
+          ) : null}
         </div>
 
-        <div className="ots-surface ots-surface--border" style={{ padding: 12 }}>
+        <div
+          className="ots-surface ots-surface--border"
+          style={{ padding: 12 }}
+        >
           <strong>Groups</strong>
 
           <div style={{ marginTop: 10, display: "grid", gap: 12 }}>
             {/* Create group */}
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                flexWrap: "wrap",
+                alignItems: "center",
+              }}
+            >
               <input
                 value={groupName}
                 onChange={(e) => setGroupName(e.target.value)}
@@ -960,22 +1168,22 @@ export default function AccountPage() {
               <button
                 type="button"
                 onClick={createGroup}
-                disabled={busy || !userId || !groupName.trim()}
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: 12,
-                  border: "1px solid rgba(0,0,0,0.2)",
-                  background: "white",
-                  cursor: "pointer",
-                  fontWeight: 700,
-                }}
+                className="ots-btn"
+                disabled={creatingGroup || !userId || !groupName.trim()}
               >
                 Create group
               </button>
             </div>
 
             {/* Join group */}
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                flexWrap: "wrap",
+                alignItems: "center",
+              }}
+            >
               <input
                 value={joinGroupId}
                 onChange={(e) => setJoinGroupId(e.target.value)}
@@ -990,15 +1198,8 @@ export default function AccountPage() {
               <button
                 type="button"
                 onClick={joinGroup}
-                disabled={busy || !userId || !joinGroupId.trim()}
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: 12,
-                  border: "1px solid rgba(0,0,0,0.2)",
-                  background: "white",
-                  cursor: "pointer",
-                  fontWeight: 700,
-                }}
+                className="ots-btn"
+                disabled={joiningGroup || !userId || !joinGroupId.trim()}
               >
                 Join group
               </button>
@@ -1006,17 +1207,27 @@ export default function AccountPage() {
 
             {/* My groups */}
             <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
                 <strong style={{ fontSize: 14 }}>My groups</strong>
-                {loadingGroups ? <span style={{ opacity: 0.7 }}>Loading…</span> : null}
+                {loadingGroups ? (
+                  <span style={{ opacity: 0.7 }}>Loading…</span>
+                ) : null}
               </div>
 
-              {(!groups || groups.length === 0) ? (
+              {!groups || groups.length === 0 ? (
                 <div style={{ marginTop: 10, opacity: 0.7 }}>None yet</div>
               ) : (
                 <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
                   <label style={{ display: "grid", gap: 6, maxWidth: 420 }}>
-                    <span style={{ fontSize: 13, color: "#333" }}>Selected group</span>
+                    <span style={{ fontSize: 13, color: "#333" }}>
+                      Selected group
+                    </span>
                     <select
                       value={selectedGroupId ?? ""}
                       onChange={(e) => setSelectedGroupId(e.target.value)}
@@ -1046,7 +1257,9 @@ export default function AccountPage() {
                         }}
                       >
                         <div style={{ minWidth: 0 }}>
-                          <div style={{ fontWeight: 700, color: "#111" }}>{g.name}</div>
+                          <div style={{ fontWeight: 700, color: "#111" }}>
+                            {g.name}
+                          </div>
                           <div style={{ fontSize: 12, opacity: 0.75 }}>
                             id: <code title={g.id}>{prettyId(g.id)}</code>
                           </div>
@@ -1054,14 +1267,7 @@ export default function AccountPage() {
                         <button
                           type="button"
                           onClick={() => setSelectedGroupId(g.id)}
-                          style={{
-                            padding: "8px 10px",
-                            borderRadius: 12,
-                            border: "1px solid rgba(0,0,0,0.2)",
-                            background: "white",
-                            cursor: "pointer",
-                            fontWeight: 700,
-                          }}
+                          className="ots-btn"
                         >
                           Select
                         </button>
@@ -1074,9 +1280,18 @@ export default function AccountPage() {
 
             {/* Add friend to selected group */}
             <div style={{ display: "grid", gap: 8 }}>
-              <strong style={{ fontSize: 14 }}>Add a friend to the selected group</strong>
+              <strong style={{ fontSize: 14 }}>
+                Add a friend to the selected group
+              </strong>
 
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 10,
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                }}
+              >
                 <select
                   value={addMemberId}
                   onChange={(e) => setAddMemberId(e.target.value)}
@@ -1102,28 +1317,25 @@ export default function AccountPage() {
                 <button
                   type="button"
                   onClick={addMemberToSelectedGroup}
-                  disabled={busy || !userId || !selectedGroupId || !addMemberId}
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: 12,
-                    border: "1px solid rgba(0,0,0,0.2)",
-                    background: "white",
-                    cursor: "pointer",
-                    fontWeight: 700,
-                  }}
+                  className="ots-btn"
+                  disabled={addingGroupMember || !userId || !selectedGroupId || !addMemberId}
                 >
                   Add to group
                 </button>
               </div>
 
               <div style={{ fontSize: 12, opacity: 0.75 }}>
-                Tip: group membership is what unlocks <code>visibility = "group"</code> spots.
+                Tip: group membership is what unlocks{" "}
+                <code>visibility = "group"</code> spots.
               </div>
             </div>
           </div>
         </div>
 
-        <div className="ots-surface ots-surface--border" style={{ padding: 12 }}>
+        <div
+          className="ots-surface ots-surface--border"
+          style={{ padding: 12 }}
+        >
           <strong>Incoming requests</strong>
           {loading ? (
             <div style={{ marginTop: 10 }}>Loading…</div>
@@ -1141,12 +1353,14 @@ export default function AccountPage() {
                   }
                   style={{ display: "flex", gap: 10, alignItems: "center" }}
                 >
-                  <code style={{ opacity: 0.75 }}>{userLabel(r.requester_id)}</code>
+                  <code style={{ opacity: 0.75 }}>
+                    {userLabel(r.requester_id)}
+                  </code>
                   <button
                     type="button"
                     className="ots-btn-accept"
                     onClick={() => accept(r.requester_id)}
-                    disabled={busy || Boolean(animatingOut[rowKey(r)])}
+                    disabled={Boolean(animatingOut[rowKey(r)])}
                   >
                     Accept
                   </button>
@@ -1154,7 +1368,7 @@ export default function AccountPage() {
                     type="button"
                     className="ots-btn-reject"
                     onClick={() => reject(r.requester_id)}
-                    disabled={busy || Boolean(animatingOut[rowKey(r)])}
+                    disabled={Boolean(animatingOut[rowKey(r)])}
                   >
                     Reject
                   </button>
@@ -1164,7 +1378,10 @@ export default function AccountPage() {
           )}
         </div>
 
-        <div className="ots-surface ots-surface--border" style={{ padding: 12 }}>
+        <div
+          className="ots-surface ots-surface--border"
+          style={{ padding: 12 }}
+        >
           <strong>Outgoing requests</strong>
           {loading ? (
             <div style={{ marginTop: 10 }}>Loading…</div>
@@ -1177,7 +1394,9 @@ export default function AccountPage() {
                   key={`${r.requester_id}->${r.addressee_id}`}
                   style={{ display: "flex", gap: 10, alignItems: "center" }}
                 >
-                  <code style={{ opacity: 0.75 }}>{userLabel(r.addressee_id)}</code>
+                  <code style={{ opacity: 0.75 }}>
+                    {userLabel(r.addressee_id)}
+                  </code>
                   <span style={{ opacity: 0.7 }}>pending</span>
                 </div>
               ))}
@@ -1185,7 +1404,10 @@ export default function AccountPage() {
           )}
         </div>
 
-        <div className="ots-surface ots-surface--border" style={{ padding: 12 }}>
+        <div
+          className="ots-surface ots-surface--border"
+          style={{ padding: 12 }}
+        >
           <strong>Friends</strong>
           {loading ? (
             <div style={{ marginTop: 10 }}>Loading…</div>
@@ -1204,15 +1426,8 @@ export default function AccountPage() {
                     <button
                       type="button"
                       onClick={() => removeFriend(other)}
-                      disabled={busy}
-                      style={{
-                        padding: "8px 10px",
-                        borderRadius: 12,
-                        border: "1px solid rgba(0,0,0,0.2)",
-                        background: "white",
-                        cursor: "pointer",
-                        fontWeight: 700,
-                      }}
+                      className="ots-btn"
+                      disabled={removingFriendId === other}
                     >
                       Remove
                     </button>

@@ -28,6 +28,36 @@ type Spot = {
 
 type SpotCategory = { id: string; label: string };
 
+const CURRENT_ONBOARDING_VERSION = 1;
+
+const ONBOARDING_STEPS = [
+  {
+    title: "Browse the map",
+    icon: "🗺️",
+    body: "Nearby Spots appear on the map and in the list. Click any spot to centre the map and open its story card.",
+  },
+  {
+    title: "Add a Spot",
+    icon: "📍",
+    body: "Use Add Spot to drop a location, write the story, and attach a photo if you have one.",
+  },
+  {
+    title: "Choose who can see it",
+    icon: "👀",
+    body: "Public is open to everyone. Friends is for your network. Group is only for members of that group.",
+  },
+  {
+    title: "Use filters",
+    icon: "🔎",
+    body: "Filter by radius, category, visibility, and search text so you can find the interesting stuff fast.",
+  },
+  {
+    title: "Build your circle",
+    icon: "🤝",
+    body: "Visit Account to add friends, manage groups, and update your profile.",
+  },
+] as const;
+
 function formatDistance(meters: number) {
   if (!Number.isFinite(meters)) return "";
   if (meters < 1000) return `${Math.round(meters)} m`;
@@ -124,6 +154,11 @@ export default function HomePage() {
   // Categories state
   const [categories, setCategories] = useState<SpotCategory[]>([]);
   const [categoriesLoaded, setCategoriesLoaded] = useState(false);
+  // DB-backed onboarding
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [checkingOnboarding, setCheckingOnboarding] = useState(false);
+  const [savingOnboarding, setSavingOnboarding] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState(0);
   useEffect(() => {
     let cancelled = false;
 
@@ -157,6 +192,46 @@ export default function HomePage() {
       cancelled = true;
     };
   }, [supabase]);
+
+  useEffect(() => {
+    if (!userId) {
+      setShowOnboarding(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      setCheckingOnboarding(true);
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("onboarding_version")
+          .eq("id", userId)
+          .maybeSingle();
+
+        if (cancelled) return;
+
+        if (error) {
+          console.warn("Failed to load onboarding status:", error.message);
+          return;
+        }
+
+        const version = Number((data as any)?.onboarding_version ?? 0);
+        setShowOnboarding(version < CURRENT_ONBOARDING_VERSION);
+        if (version < CURRENT_ONBOARDING_VERSION) setOnboardingStep(0);
+      } catch (e) {
+        if (cancelled) return;
+        console.warn("Failed to load onboarding status:", e);
+      } finally {
+        if (!cancelled) setCheckingOnboarding(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, supabase]);
 
   const filteredSpots = spots.filter((s) => {
     const catOk = categoryFilter === "all" || s.category === categoryFilter;
@@ -369,6 +444,37 @@ export default function HomePage() {
     };
   }
 
+  async function dismissOnboarding() {
+    if (!userId) {
+      setShowOnboarding(false);
+      return;
+    }
+
+    setSavingOnboarding(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          onboarding_version: CURRENT_ONBOARDING_VERSION,
+          onboarding_seen_at: new Date().toISOString(),
+        })
+        .eq("id", userId);
+
+      if (error) {
+        console.warn("Failed to save onboarding state:", error.message);
+      }
+
+      setShowOnboarding(false);
+    } finally {
+      setSavingOnboarding(false);
+    }
+  }
+
+  function hideOnboardingForNow() {
+    setShowOnboarding(false);
+    setOnboardingStep(0);
+  }
+
   return (
     <AppShell
       subtitle="Nearby stories on the map"
@@ -473,6 +579,252 @@ export default function HomePage() {
         </div>
       }
     >
+      {showOnboarding && !checkingOnboarding && (
+        <div
+          onClick={() => {
+            // Clicking the overlay should NOT mark onboarding as complete.
+            if (!savingOnboarding) hideOnboardingForNow();
+          }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            display: "grid",
+            placeItems: "center",
+            padding: 16,
+            zIndex: 1200,
+          }}
+        >
+          <div
+            className="ots-surface ots-surface--shadow"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "min(760px, 100%)",
+              maxHeight: "90vh",
+              overflow: "auto",
+              padding: 0,
+            }}
+          >
+            {/* Header */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 12,
+                padding: 14,
+                borderBottom: "1px solid rgba(0,0,0,0.1)",
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div
+                    aria-hidden="true"
+                    style={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: 14,
+                      display: "grid",
+                      placeItems: "center",
+                      background: "rgba(0,255,251,0.12)",
+                      border: "1px solid rgba(0,0,0,0.08)",
+                      flex: "0 0 auto",
+                    }}
+                  >
+                    <span style={{ fontSize: 18 }}>📌</span>
+                  </div>
+
+                  <div style={{ minWidth: 0 }}>
+                    <strong style={{ fontSize: 18, color: "#111" }}>Welcome to OnTheSpot</strong>
+                    <div style={{ marginTop: 2, fontSize: 13, color: "#555" }}>
+                      A quick tour so the map doesn’t feel like a mysterious glowing rectangle.
+                    </div>
+                  </div>
+                </div>
+
+                {/* Progress */}
+                <div style={{ marginTop: 10 }}>
+                  <div
+                    style={{
+                      height: 8,
+                      borderRadius: 999,
+                      background: "rgba(0,0,0,0.06)",
+                      overflow: "hidden",
+                      border: "1px solid rgba(0,0,0,0.06)",
+                    }}
+                    aria-label="Onboarding progress"
+                    role="progressbar"
+                    aria-valuenow={onboardingStep + 1}
+                    aria-valuemin={1}
+                    aria-valuemax={ONBOARDING_STEPS.length}
+                  >
+                    <div
+                      style={{
+                        width: `${Math.round(((onboardingStep + 1) / ONBOARDING_STEPS.length) * 100)}%`,
+                        height: "100%",
+                        background:
+                          "linear-gradient(90deg, rgba(0,255,251,0.55), rgba(255,183,0,0.55))",
+                      }}
+                    />
+                  </div>
+                  <div style={{ marginTop: 6, fontSize: 12, color: "#666" }}>
+                    Step {onboardingStep + 1} of {ONBOARDING_STEPS.length}
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={hideOnboardingForNow}
+                disabled={savingOnboarding}
+                className="ots-btn"
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: 12,
+                  background: "white",
+                  flex: "0 0 auto",
+                }}
+                title="Close (show later)"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Body */}
+            <div style={{ display: "grid", gap: 12, padding: 16 }}>
+              <div
+                className="ots-surface ots-surface--border"
+                style={{ padding: 14, display: "flex", gap: 12, alignItems: "flex-start" }}
+              >
+                <div
+                  aria-hidden="true"
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 14,
+                    display: "grid",
+                    placeItems: "center",
+                    background: "rgba(0,0,0,0.04)",
+                    border: "1px solid rgba(0,0,0,0.06)",
+                    flex: "0 0 auto",
+                    fontSize: 20,
+                  }}
+                >
+                  {ONBOARDING_STEPS[onboardingStep]?.icon}
+                </div>
+
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 900, color: "#111", fontSize: 16 }}>
+                    {ONBOARDING_STEPS[onboardingStep]?.title}
+                  </div>
+                  <div style={{ marginTop: 6, color: "#333", lineHeight: 1.35 }}>
+                    {ONBOARDING_STEPS[onboardingStep]?.body}
+                  </div>
+                </div>
+              </div>
+
+              {/* Step dots */}
+              <div style={{ display: "flex", gap: 8, justifyContent: "center", paddingTop: 2 }}>
+                {ONBOARDING_STEPS.map((_, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setOnboardingStep(i)}
+                    aria-label={`Go to step ${i + 1}`}
+                    style={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: 999,
+                      border: "1px solid rgba(0,0,0,0.15)",
+                      background: i === onboardingStep ? "#111" : "rgba(0,0,0,0.10)",
+                      cursor: "pointer",
+                      padding: 0,
+                    }}
+                  />
+                ))}
+              </div>
+
+              {/* Footer */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 12,
+                  flexWrap: "wrap",
+                  marginTop: 4,
+                }}
+              >
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <button
+                    type="button"
+                    className="ots-btn"
+                    disabled={savingOnboarding || onboardingStep === 0}
+                    onClick={() => setOnboardingStep((s) => Math.max(0, s - 1))}
+                  >
+                    ← Back
+                  </button>
+
+                  {onboardingStep < ONBOARDING_STEPS.length - 1 ? (
+                    <button
+                      type="button"
+                      className="ots-btn"
+                      disabled={savingOnboarding}
+                      onClick={() => setOnboardingStep((s) => Math.min(ONBOARDING_STEPS.length - 1, s + 1))}
+                      style={{
+                        borderColor: "rgba(0,0,0,0.18)",
+                        background:
+                          "linear-gradient(180deg, rgba(0,255,251,0.20), rgba(0,255,251,0.08))",
+                        fontWeight: 800,
+                      }}
+                    >
+                      Next →
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={dismissOnboarding}
+                      disabled={savingOnboarding}
+                      className="ots-btn"
+                      style={{
+                        border: "1px solid rgba(0,0,0,0.2)",
+                        background: "#111",
+                        color: "white",
+                        cursor: "pointer",
+                        fontWeight: 900,
+                      }}
+                    >
+                      {savingOnboarding ? "Saving…" : "Finish"}
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <button
+                    type="button"
+                    onClick={hideOnboardingForNow}
+                    disabled={savingOnboarding}
+                    className="ots-btn"
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: 999,
+                      background: "white",
+                    }}
+                    title="Close for now"
+                  >
+                    Show later
+                  </button>
+
+                  <div style={{ fontSize: 12, color: "#666" }}>
+                    Saved to your profile when you finish.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showFilters && (
         <div
           className="ots-sheet-overlay"
@@ -681,7 +1033,7 @@ export default function HomePage() {
           <aside className="ots-list ots-surface ots-surface--border">
             <h3 style={{ marginTop: 0 }}>Nearby Spots</h3>
 
-            {spots.length === 0 ? (
+            {filteredSpots.length === 0 ? (
               <p style={{ opacity: 0.7 }}>No Spots found with these filters.</p>
             ) : (
               <div style={{ display: "grid", gap: 10 }}>
