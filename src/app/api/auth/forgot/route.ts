@@ -24,8 +24,7 @@ export async function POST(req: Request) {
     h.get("origin") ||
     `${h.get("x-forwarded-proto") ?? "https"}://${h.get("x-forwarded-host") ?? h.get("host")}`;
 
-  // IMPORTANT: matches your Supabase Redirect URLs
-  const redirectTo = `${origin}/reset-password`;
+  const redirectTo = `${origin}/auth/reset`;
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
 

@@ -13,7 +13,7 @@ export default function ForgotPasswordPage() {
     setBusy(true);
 
     try {
-      const res = await fetch("/auth/forgot", {
+      const res = await fetch("/api/auth/forgot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
