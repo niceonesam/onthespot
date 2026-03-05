@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 export async function middleware(request: NextRequest) {
-  const response = NextResponse.next();
+  const response = NextResponse.next({ request });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,6 +31,7 @@ export async function middleware(request: NextRequest) {
   const isPublic =
     path.startsWith("/login") ||
     path.startsWith("/auth") ||
+    path.startsWith("/reset-password") ||
     path.startsWith("/api") ||
     path.startsWith("/_next") ||
     path.startsWith("/favicon.ico");
@@ -60,6 +61,6 @@ export const config = {
       - Next.js internals
       - favicon
     */
-    "/((?!api|_next/static|_next/image|favicon.ico).*)",
+    "/((?!api/|_next/static|_next/image|favicon.ico).*)",
   ],
 };
