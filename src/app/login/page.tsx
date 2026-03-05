@@ -1,20 +1,33 @@
 "use client";
 
+import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
 
-export default function LoginPage() {
+function LoginInner() {
   const searchParams = useSearchParams();
   const next = searchParams.get("next") || "/";
   const error = searchParams.get("error");
 
   const [mode, setMode] = useState<"login" | "signup">("login");
-  const action = useMemo(() => (mode === "login" ? "/auth/signin" : "/auth/signup"), [mode]);
+  const action = useMemo(
+    () => (mode === "login" ? "/auth/signin" : "/auth/signup"),
+    [mode]
+  );
 
   return (
     <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 16 }}>
-      <div style={{ width: "min(420px, 100%)", border: "1px solid #e5e5e5", borderRadius: 16, padding: 16, background: "white" }}>
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: "black", marginBottom: 4 }}>OnTheSpot</h1>
+      <div
+        style={{
+          width: "min(420px, 100%)",
+          border: "1px solid #e5e5e5",
+          borderRadius: 16,
+          padding: 16,
+          background: "white",
+        }}
+      >
+        <h1 style={{ fontSize: 22, fontWeight: 800, color: "black", marginBottom: 4 }}>
+          OnTheSpot
+        </h1>
         <p style={{ marginTop: 0, color: "#555", marginBottom: 16 }}>
           {mode === "login" ? "Log in to continue" : "Create an account"}
         </p>
@@ -23,14 +36,30 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={() => setMode("login")}
-            style={{ flex: 1, padding: 10, borderRadius: 12, border: "1px solid #ddd", background: mode === "login" ? "#f3f3f3" : "white", color: "#555", cursor: "pointer" }}
+            style={{
+              flex: 1,
+              padding: 10,
+              borderRadius: 12,
+              border: "1px solid #ddd",
+              background: mode === "login" ? "#f3f3f3" : "white",
+              color: "#555",
+              cursor: "pointer",
+            }}
           >
             Log in
           </button>
           <button
             type="button"
             onClick={() => setMode("signup")}
-            style={{ flex: 1, padding: 10, borderRadius: 12, border: "1px solid #ddd", background: mode === "signup" ? "#f3f3f3" : "white", color: "#555", cursor: "pointer" }}
+            style={{
+              flex: 1,
+              padding: 10,
+              borderRadius: 12,
+              border: "1px solid #ddd",
+              background: mode === "signup" ? "#f3f3f3" : "white",
+              color: "#555",
+              cursor: "pointer",
+            }}
           >
             Sign up
           </button>
@@ -55,18 +84,64 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            style={{ padding: 10, borderRadius: 12, border: "1px solid #ddd", background: "white", color: "#555", cursor: "pointer", fontWeight: 700 }}
+            style={{
+              padding: 10,
+              borderRadius: 12,
+              border: "1px solid #ddd",
+              background: "white",
+              color: "#555",
+              cursor: "pointer",
+              fontWeight: 700,
+            }}
           >
             {mode === "login" ? "Continue" : "Create account"}
           </button>
 
           {error && (
-            <div style={{ background: "#fff3cd", border: "1px solid #ffeeba", padding: 10, borderRadius: 12, color: "#333" }}>
+            <div
+              style={{
+                background: "#fff3cd",
+                border: "1px solid #ffeeba",
+                padding: 10,
+                borderRadius: 12,
+                color: "#333",
+              }}
+            >
               {error}
             </div>
           )}
         </form>
       </div>
     </div>
+  );
+}
+
+function LoginFallback() {
+  return (
+    <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 16 }}>
+      <div
+        style={{
+          width: "min(420px, 100%)",
+          border: "1px solid #e5e5e5",
+          borderRadius: 16,
+          padding: 16,
+          background: "white",
+        }}
+      >
+        <div style={{ height: 22, width: 140, borderRadius: 10, background: "#e5e7eb" }} />
+        <div style={{ height: 14, width: 220, borderRadius: 10, background: "#eef2f7", marginTop: 10 }} />
+        <div style={{ height: 40, width: "100%", borderRadius: 12, background: "#e5e7eb", marginTop: 16 }} />
+        <div style={{ height: 40, width: "100%", borderRadius: 12, background: "#e5e7eb", marginTop: 10 }} />
+        <div style={{ height: 40, width: "100%", borderRadius: 12, background: "#eef2f7", marginTop: 10 }} />
+      </div>
+    </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginFallback />}>
+      <LoginInner />
+    </Suspense>
   );
 }
