@@ -35,6 +35,7 @@ const STATE_FILE = process.env.STATE_FILE ?? ".wikidata_import_state.json";
 const MAX_PAGES = Number(process.env.MAX_PAGES ?? 0); // 0 = unlimited
 const RESUME = String(process.env.RESUME ?? "true").toLowerCase() === "true";
 const RESET_STATE = String(process.env.RESET_STATE ?? "false").toLowerCase() === "true";
+const IMPORT_MODE = process.env.IMPORT_MODE ?? "event_only"; // event_only | historic_and_cultural | dated_places
 
 const IMPORT_USER_ID = process.env.IMPORT_USER_ID;
 if (!IMPORT_USER_ID) {
@@ -158,7 +159,7 @@ function printSamples(spots, n) {
 }
 
 function buildLeanSparql(limit, offset) {
-  return `
+  const baseSelect = `
 SELECT ?item ?coords ?p31 ?time ?start ?end ?desc WHERE {
   ?item wdt:P625 ?coords .
   OPTIONAL { ?item wdt:P31 ?p31 . }
@@ -169,7 +170,9 @@ SELECT ?item ?coords ?p31 ?time ?start ?end ?desc WHERE {
     ?item schema:description ?desc .
     FILTER (lang(?desc) = "en")
   }
+`;
 
+  const eventOnlyWhere = `
   {
     ?item wdt:P31/wdt:P279* wd:Q1656682 .  # event
   }
@@ -178,10 +181,67 @@ SELECT ?item ?coords ?p31 ?time ?start ?end ?desc WHERE {
     VALUES ?inst { wd:Q178561 wd:Q3839081 wd:Q40231 wd:Q1190554 wd:Q618123 }
     ?item wdt:P31/wdt:P279* ?inst .
   }
+`;
+
+  const historicAndCulturalWhere = `
+  {
+    ?item wdt:P31/wdt:P279* wd:Q1656682 .  # event
+  }
+  UNION
+  {
+    VALUES ?inst {
+      wd:Q178561    # battle
+      wd:Q3839081   # festival
+      wd:Q40231     # election
+      wd:Q1190554   # occurrence
+      wd:Q618123    # geological event
+      wd:Q839954    # archaeological site
+      wd:Q9259      # world heritage site
+      wd:Q4989906   # monument
+      wd:Q207694    # museum
+      wd:Q23413     # castle
+      wd:Q33506     # museum / gallery-style cultural venue fallback family branch via p31 tree
+      wd:Q16970     # church building
+    }
+    ?item wdt:P31/wdt:P279* ?inst .
+    FILTER (BOUND(?time) || BOUND(?start) || BOUND(?end) || ?inst IN (
+      wd:Q839954,
+      wd:Q9259,
+      wd:Q4989906,
+      wd:Q207694,
+      wd:Q23413,
+      wd:Q33506,
+      wd:Q16970
+    ))
+  }
+`;
+
+  const datedPlacesWhere = `
+  FILTER (BOUND(?time) || BOUND(?start) || BOUND(?end))
+`;
+
+  let modeWhere = eventOnlyWhere;
+  if (IMPORT_MODE === "historic_and_cultural") modeWhere = historicAndCulturalWhere;
+  if (IMPORT_MODE === "dated_places") modeWhere = datedPlacesWhere;
+
+  return `
+${baseSelect}
+${modeWhere}
 }
+ORDER BY ?item
 LIMIT ${limit}
 OFFSET ${offset}
 `;
+}
+
+function validateImportMode() {
+  const allowed = new Set(["event_only", "historic_and_cultural", "dated_places"]);
+  if (!allowed.has(IMPORT_MODE)) {
+    console.error(
+      `Invalid IMPORT_MODE='${IMPORT_MODE}'. Use one of: event_only, historic_and_cultural, dated_places`
+    );
+    process.exit(1);
+  }
 }
 
 /**
@@ -285,7 +345,7 @@ async function upsertBatch(batch) {
 }
 
 async function fetchPage(offset) {
-  console.log(`\n=== Page OFFSET=${offset} LIMIT=${LIMIT} pace=${pace.ms}ms ===`);
+  console.log(`\n=== Page OFFSET=${offset} LIMIT=${LIMIT} pace=${pace.ms}ms mode=${IMPORT_MODE} ===`);
   const json = await sparqlQuery(buildLeanSparql(LIMIT, offset));
   return json.results.bindings;
 }
@@ -314,6 +374,7 @@ async function createPage(runId, offset, limit, paceMs) {
 }
 
 async function main() {
+  validateImportMode();
   maybeResetState();
 
   const categoryMap = await loadP31CategoryMap();
@@ -510,6 +571,7 @@ async function main() {
   }
 
   console.log("\n=== Summary ===");
+  console.log(`Import mode: ${IMPORT_MODE}`);
   console.log(`Prepared: ${totalPrepared}`);
   console.log(`Written:  ${DRY_RUN ? 0 : totalWritten}`);
   console.log(`State file: ${STATE_FILE}`);
