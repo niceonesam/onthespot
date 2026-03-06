@@ -17,6 +17,10 @@ export default function AddSpotForm() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState<string>("");
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState("");
+  const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
+  const [loadingTagSuggestions, setLoadingTagSuggestions] = useState(false);
 
   // Categories are driven by DB (public.spot_categories)
   const [categories, setCategories] = useState<Array<{ id: string; label: string }>>(
@@ -188,6 +192,72 @@ const [loadingCategories, setLoadingCategories] = useState(false);
       setGroupId("");
     }
   }, [visibility]);
+
+  function normalizeTag(raw: string) {
+    return raw
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .replace(/^#+/, "")
+      .slice(0, 40);
+  }
+
+  function addTag(raw: string) {
+    const next = normalizeTag(raw);
+    if (!next) return;
+    setTags((prev) => (prev.includes(next) ? prev : [...prev, next]));
+    setTagInput("");
+  }
+
+  function removeTag(tag: string) {
+    setTags((prev) => prev.filter((t) => t !== tag));
+  }
+
+  useEffect(() => {
+    const q = normalizeTag(tagInput);
+
+    if (!q || q.length < 2) {
+      setTagSuggestions([]);
+      setLoadingTagSuggestions(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      setLoadingTagSuggestions(true);
+      try {
+        const { data, error } = await supabase
+          .from("spot_tags")
+          .select("name")
+          .ilike("normalized_name", `${q}%`)
+          .limit(6);
+
+        if (cancelled) return;
+
+        if (error) {
+          setTagSuggestions([]);
+          return;
+        }
+
+        const names = Array.from(
+          new Set(
+            (data ?? [])
+              .map((r: any) => String(r?.name ?? "").trim().toLowerCase())
+              .filter(Boolean)
+          )
+        ).filter((name) => !tags.includes(name));
+
+        setTagSuggestions(names);
+      } finally {
+        if (!cancelled) setLoadingTagSuggestions(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [tagInput, tags, supabase]);
 
   useEffect(() => {
     if (!pos) return;
@@ -417,6 +487,7 @@ const [loadingCategories, setLoadingCategories] = useState(false);
           p_title: title,
           p_description: description,
           p_category: category,
+          p_tags: tags,
           p_location: `POINT(${pos.lng} ${pos.lat})`,
           p_photo_path: photoPath ?? null,
           p_photo_url: photoUrl ?? null,
@@ -502,6 +573,137 @@ const [loadingCategories, setLoadingCategories] = useState(false);
                   resize: "vertical",
                 }}
               />
+            </label>
+
+            <label style={{ display: "grid", gap: 6 }}>
+              <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Category</span>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                disabled={loadingCategories || categories.length === 0}
+                style={{
+                  padding: 10,
+                  borderRadius: 12,
+                  border: "1px solid rgba(0,0,0,0.2)",
+                }}
+              >
+                {!category ? (
+                  <option value="">
+                    {loadingCategories
+                      ? "Loading categories…"
+                      : categories.length
+                        ? "Select a category"
+                        : "No categories available"}
+                  </option>
+                ) : null}
+
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+
+              <div style={{ fontSize: 12, color: "#666" }}>
+                Pick the main theme of this spot. You’ll be able to filter by it later.
+              </div>
+
+              {categories.length === 0 && !loadingCategories ? (
+                <div style={{ marginTop: 6, opacity: 0.75, fontSize: 13 }}>
+                  No categories found. Check RLS/policies on <code>spot_categories</code>.
+                </div>
+              ) : null}
+            </label>
+            <label style={{ display: "grid", gap: 6 }}>
+              <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Tags (optional)</span>
+
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                <input
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === ",") {
+                      e.preventDefault();
+                      addTag(tagInput);
+                    }
+                    if (e.key === "Tab" && tagSuggestions.length > 0) {
+                      e.preventDefault();
+                      addTag(tagSuggestions[0]);
+                    }
+                  }}
+                  placeholder="Add tags like history, war, london"
+                  style={{
+                    flex: "1 1 280px",
+                    padding: 10,
+                    borderRadius: 12,
+                    border: "1px solid rgba(0,0,0,0.2)",
+                  }}
+                />
+                <button
+                  type="button"
+                  className="ots-btn"
+                  onClick={() => addTag(tagInput)}
+                  disabled={!tagInput.trim()}
+                >
+                  Add tag
+                </button>
+              </div>
+
+              <div style={{ fontSize: 12, color: "#666" }}>
+                Use multiple tags for people, themes, eras, places, or events. Press Enter or comma to add one, or Tab to accept the first suggestion.
+              </div>
+
+              {(loadingTagSuggestions || tagSuggestions.length > 0) && (
+                <div style={{ display: "grid", gap: 6 }}>
+                  <div style={{ fontSize: 12, color: "#666" }}>
+                    {loadingTagSuggestions ? "Looking for matching tags…" : "Suggestions"}
+                  </div>
+
+                  {!loadingTagSuggestions && tagSuggestions.length > 0 && (
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {tagSuggestions.map((tag) => (
+                        <button
+                          key={tag}
+                          type="button"
+                          className="ots-btn"
+                          onClick={() => addTag(tag)}
+                          style={{
+                            padding: "6px 10px",
+                            borderRadius: 999,
+                            fontWeight: 700,
+                          }}
+                        >
+                          #{tag}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {tags.length > 0 && (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 2 }}>
+                  {tags.map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => removeTag(tag)}
+                      style={{
+                        padding: "6px 10px",
+                        borderRadius: 999,
+                        border: "1px solid rgba(0,0,0,0.15)",
+                        background: "rgba(0,255,251,0.08)",
+                        cursor: "pointer",
+                        color: "#111",
+                        fontWeight: 700,
+                      }}
+                      title={`Remove ${tag}`}
+                    >
+                      #{tag} ×
+                    </button>
+                  ))}
+                </div>
+              )}
             </label>
           </div>
         </div>
@@ -735,41 +937,6 @@ const [loadingCategories, setLoadingCategories] = useState(false);
                 </label>
               )}
 
-              <label style={{ display: "grid", gap: 6 }}>
-                <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Category</span>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  disabled={loadingCategories || categories.length === 0}
-                  style={{
-                    padding: 10,
-                    borderRadius: 12,
-                    border: "1px solid rgba(0,0,0,0.2)",
-                  }}
-                >
-                  {!category ? (
-                    <option value="">
-                      {loadingCategories
-                        ? "Loading categories…"
-                        : categories.length
-                          ? "Select a category"
-                          : "No categories available"}
-                    </option>
-                  ) : null}
-
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
-
-                {categories.length === 0 && !loadingCategories ? (
-                  <div style={{ marginTop: 6, opacity: 0.75, fontSize: 13 }}>
-                    No categories found. Check RLS/policies on <code>spot_categories</code>.
-                  </div>
-                ) : null}
-              </label>
 
               <label style={{ display: "grid", gap: 6 }}>
                 <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Photo</span>
