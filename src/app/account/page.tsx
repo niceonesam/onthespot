@@ -1115,47 +1115,6 @@ export default function AccountPage() {
           className="ots-surface ots-surface--border"
           style={{ padding: 12 }}
         >
-          <strong>Add a friend</strong>
-          <div
-            style={{
-              marginTop: 10,
-              display: "flex",
-              gap: 10,
-              flexWrap: "wrap",
-            }}
-          >
-            <input
-              value={addEmail}
-              onChange={(e) => setAddEmail(e.target.value)}
-              placeholder="friend@email.com"
-              style={{
-                padding: 10,
-                borderRadius: 12,
-                border: "1px solid rgba(0,0,0,0.2)",
-                minWidth: 260,
-              }}
-            />
-            <button
-              type="button"
-              onClick={sendRequestByEmail}
-              className="ots-btn"
-              disabled={sendingFriendRequest || !userId}
-            >
-              Send request
-            </button>
-          </div>
-          
-          {labelsStatus ? (
-            <div style={{ marginTop: 8, fontSize: 12, opacity: 0.65 }}>
-              {labelsStatus}
-            </div>
-          ) : null}
-        </div>
-
-        <div
-          className="ots-surface ots-surface--border"
-          style={{ padding: 12 }}
-        >
           <strong>Groups</strong>
 
           <div style={{ marginTop: 10, display: "grid", gap: 12 }}>
@@ -1358,110 +1317,180 @@ export default function AccountPage() {
           </div>
         </div>
 
+        {/* Friends section card */}
         <div
           className="ots-surface ots-surface--border"
           style={{ padding: 12 }}
         >
-          <strong>Incoming requests</strong>
-          {loading ? (
-            <div style={{ marginTop: 10 }}>Loading…</div>
-          ) : incoming.length === 0 ? (
-            <div style={{ marginTop: 10, opacity: 0.7 }}>None</div>
-          ) : (
-            <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
-              {incoming.map((r) => (
-                <div
-                  key={rowKey(r)}
-                  className={
-                    animatingOut[rowKey(r)]
-                      ? `ots-row-fade-out ots-row-fade-out--${animatingOut[rowKey(r)]}`
-                      : ""
-                  }
-                  style={{ display: "flex", gap: 10, alignItems: "center" }}
-                >
-                  <code style={{ opacity: 0.75 }}>
-                    {userLabel(r.requester_id)}
-                  </code>
-                  <button
-                    type="button"
-                    className="ots-btn-accept"
-                    onClick={() => accept(r.requester_id)}
-                    disabled={Boolean(animatingOut[rowKey(r)])}
-                  >
-                    Accept
-                  </button>
-                  <button
-                    type="button"
-                    className="ots-btn-reject"
-                    onClick={() => reject(r.requester_id)}
-                    disabled={Boolean(animatingOut[rowKey(r)])}
-                  >
-                    Reject
-                  </button>
-                </div>
-              ))}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 12,
+              flexWrap: "wrap",
+            }}
+          >
+            <strong>Friends</strong>
+            <div style={{ fontSize: 12, opacity: 0.7 }}>
+              Add people, manage requests, and see your current friends.
             </div>
-          )}
-        </div>
+          </div>
 
-        <div
-          className="ots-surface ots-surface--border"
-          style={{ padding: 12 }}
-        >
-          <strong>Outgoing requests</strong>
-          {loading ? (
-            <div style={{ marginTop: 10 }}>Loading…</div>
-          ) : outgoing.length === 0 ? (
-            <div style={{ marginTop: 10, opacity: 0.7 }}>None</div>
-          ) : (
-            <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
-              {outgoing.map((r) => (
-                <div
-                  key={`${r.requester_id}->${r.addressee_id}`}
-                  style={{ display: "flex", gap: 10, alignItems: "center" }}
+          <div style={{ marginTop: 14, display: "grid", gap: 16 }}>
+            {/* Add a friend */}
+            <div>
+              <div style={{ fontWeight: 700, color: "#111" }}>Add a friend</div>
+              <div
+                style={{
+                  marginTop: 10,
+                  display: "flex",
+                  gap: 10,
+                  flexWrap: "wrap",
+                }}
+              >
+                <input
+                  value={addEmail}
+                  onChange={(e) => setAddEmail(e.target.value)}
+                  placeholder="friend@email.com"
+                  style={{
+                    padding: 10,
+                    borderRadius: 12,
+                    border: "1px solid rgba(0,0,0,0.2)",
+                    minWidth: 260,
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={sendRequestByEmail}
+                  className="ots-btn"
+                  disabled={sendingFriendRequest || !userId}
                 >
-                  <code style={{ opacity: 0.75 }}>
-                    {userLabel(r.addressee_id)}
-                  </code>
-                  <span style={{ opacity: 0.7 }}>pending</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                  {sendingFriendRequest ? "Sending…" : "Send request"}
+                </button>
+              </div>
 
-        <div
-          className="ots-surface ots-surface--border"
-          style={{ padding: 12 }}
-        >
-          <strong>Friends</strong>
-          {loading ? (
-            <div style={{ marginTop: 10 }}>Loading…</div>
-          ) : friends.length === 0 ? (
-            <div style={{ marginTop: 10, opacity: 0.7 }}>None yet</div>
-          ) : (
-            <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
-              {friends.map((r) => {
-                const other = otherId(r);
-                return (
-                  <div
-                    key={`${r.requester_id}<->${r.addressee_id}`}
-                    style={{ display: "flex", gap: 10, alignItems: "center" }}
-                  >
-                    <code style={{ opacity: 0.75 }}>{userLabel(other)}</code>
-                    <button
-                      type="button"
-                      onClick={() => removeFriend(other)}
-                      className="ots-btn"
-                      disabled={removingFriendId === other}
-                    >
-                      Remove
-                    </button>
+              {labelsStatus ? (
+                <div style={{ marginTop: 8, fontSize: 12, opacity: 0.65 }}>
+                  {labelsStatus}
+                </div>
+              ) : null}
+            </div>
+
+            {/* Incoming / outgoing requests side by side on desktop */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                gap: 12,
+              }}
+            >
+              <div className="ots-surface ots-surface--border" style={{ padding: 12 }}>
+                <strong style={{ fontSize: 14 }}>Incoming requests</strong>
+                {loading ? (
+                  <div style={{ marginTop: 10 }}>Loading…</div>
+                ) : incoming.length === 0 ? (
+                  <div style={{ marginTop: 10, opacity: 0.7 }}>None</div>
+                ) : (
+                  <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
+                    {incoming.map((r) => (
+                      <div
+                        key={rowKey(r)}
+                        className={
+                          animatingOut[rowKey(r)]
+                            ? `ots-row-fade-out ots-row-fade-out--${animatingOut[rowKey(r)]}`
+                            : ""
+                        }
+                        style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}
+                      >
+                        <code style={{ opacity: 0.75 }}>{userLabel(r.requester_id)}</code>
+                        <button
+                          type="button"
+                          className="ots-btn-accept"
+                          onClick={() => accept(r.requester_id)}
+                          disabled={Boolean(animatingOut[rowKey(r)])}
+                        >
+                          Accept
+                        </button>
+                        <button
+                          type="button"
+                          className="ots-btn-reject"
+                          onClick={() => reject(r.requester_id)}
+                          disabled={Boolean(animatingOut[rowKey(r)])}
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                );
-              })}
+                )}
+              </div>
+
+              <div className="ots-surface ots-surface--border" style={{ padding: 12 }}>
+                <strong style={{ fontSize: 14 }}>Outgoing requests</strong>
+                {loading ? (
+                  <div style={{ marginTop: 10 }}>Loading…</div>
+                ) : outgoing.length === 0 ? (
+                  <div style={{ marginTop: 10, opacity: 0.7 }}>None</div>
+                ) : (
+                  <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
+                    {outgoing.map((r) => (
+                      <div
+                        key={`${r.requester_id}->${r.addressee_id}`}
+                        style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}
+                      >
+                        <code style={{ opacity: 0.75 }}>{userLabel(r.addressee_id)}</code>
+                        <span style={{ opacity: 0.7 }}>pending</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-          )}
+
+            {/* Current friends */}
+            <div>
+              <div style={{ fontWeight: 700, color: "#111" }}>Your friends</div>
+              {loading ? (
+                <div style={{ marginTop: 10 }}>Loading…</div>
+              ) : friends.length === 0 ? (
+                <div style={{ marginTop: 10, opacity: 0.7 }}>None yet</div>
+              ) : (
+                <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
+                  {friends.map((r) => {
+                    const other = otherId(r);
+                    return (
+                      <div
+                        key={`${r.requester_id}<->${r.addressee_id}`}
+                        className="ots-surface ots-surface--border"
+                        style={{
+                          padding: 10,
+                          display: "flex",
+                          justifyContent: "space-between",
+                          gap: 10,
+                          alignItems: "center",
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 700, color: "#111" }}>{userLabel(other)}</div>
+                          <div style={{ fontSize: 12, opacity: 0.7 }}>Connected</div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeFriend(other)}
+                          className="ots-btn"
+                          disabled={removingFriendId === other}
+                        >
+                          {removingFriendId === other ? "Removing…" : "Remove"}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </AppShell>
