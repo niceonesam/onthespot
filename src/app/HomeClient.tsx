@@ -12,6 +12,7 @@ type Spot = {
   title: string;
   description: string;
   category: string;
+  tags?: string[] | null;
   photo_url: string | null;
   photo_path: string | null;
   what3words: string | null;
@@ -121,6 +122,53 @@ function VisibilityBadge(props: { visibility: Spot["visibility"] }) {
   );
 }
 
+function TagPills(props: { tags?: string[] | null; max?: number }) {
+  const tags = (props.tags ?? []).filter(Boolean);
+  if (!tags.length) return null;
+
+  const max = props.max ?? 3;
+  const shown = tags.slice(0, max);
+  const remaining = tags.length - shown.length;
+
+  return (
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
+      {shown.map((tag) => (
+        <span
+          key={tag}
+          style={{
+            fontSize: 12,
+            padding: "3px 8px",
+            borderRadius: 999,
+            background: "rgba(0,255,251,0.10)",
+            border: "1px solid rgba(0,0,0,0.08)",
+            color: "#111",
+            fontWeight: 700,
+            lineHeight: 1.2,
+          }}
+        >
+          #{tag}
+        </span>
+      ))}
+      {remaining > 0 && (
+        <span
+          style={{
+            fontSize: 12,
+            padding: "3px 8px",
+            borderRadius: 999,
+            background: "rgba(0,0,0,0.04)",
+            border: "1px solid rgba(0,0,0,0.08)",
+            color: "#333",
+            fontWeight: 700,
+            lineHeight: 1.2,
+          }}
+        >
+          +{remaining}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export default function HomePage() {
   const supabase = getSupabaseBrowser();
 
@@ -147,6 +195,10 @@ export default function HomePage() {
   const filterTouchStartYRef = useRef<number | null>(null);
   const filterTouchCurrentYRef = useRef<number | null>(null);
   const [filterSheetDragY, setFilterSheetDragY] = useState(0);
+  // Spot sheet drag state
+  const spotTouchStartYRef = useRef<number | null>(null);
+  const spotTouchCurrentYRef = useRef<number | null>(null);
+  const [spotSheetDragY, setSpotSheetDragY] = useState(0);
   // New filters
   const [searchText, setSearchText] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -244,6 +296,61 @@ export default function HomePage() {
     const visOk = visibilityFilter === "all" || vis === visibilityFilter;
     return catOk && visOk;
   });
+
+  const selectedCategoryLabel =
+    categoryFilter === "all"
+      ? null
+      : categories.find((c) => c.id === categoryFilter)?.label ?? "Category";
+
+  const activeFilterParts = [
+    radiusM !== 2500 ? formatDistance(radiusM) : null,
+    selectedCategoryLabel,
+    visibilityFilter !== "all"
+      ? visibilityFilter.charAt(0).toUpperCase() + visibilityFilter.slice(1)
+      : null,
+    importedOnly ? "Imported" : null,
+    searchText.trim() ? `“${searchText.trim()}”` : null,
+  ].filter(Boolean) as string[];
+
+  const filterSummary = activeFilterParts.length
+    ? activeFilterParts.join(" • ")
+    : null;
+
+  const mobileQuickChips = [
+    {
+      key: "all",
+      label: "All",
+      active: visibilityFilter === "all" && !importedOnly,
+      onClick: () => {
+        setVisibilityFilter("all");
+        setImportedOnly(false);
+      },
+    },
+    {
+      key: "public",
+      label: "Public",
+      active: visibilityFilter === "public",
+      onClick: () => setVisibilityFilter("public"),
+    },
+    {
+      key: "friends",
+      label: "Friends",
+      active: visibilityFilter === "friends",
+      onClick: () => setVisibilityFilter("friends"),
+    },
+    {
+      key: "group",
+      label: "Group",
+      active: visibilityFilter === "group",
+      onClick: () => setVisibilityFilter("group"),
+    },
+    {
+      key: "imported",
+      label: "Imported",
+      active: importedOnly,
+      onClick: () => setImportedOnly((v) => !v),
+    },
+  ] as const;
 
   const addHref = mapCenter
     ? `/add?lat=${mapCenter.lat}&lng=${mapCenter.lng}`
@@ -451,23 +558,29 @@ export default function HomePage() {
     }
   }
 
-  function markerIconForVisibility(v?: string | null): google.maps.Icon {
+  function markerIconForVisibility(v?: string | null, isSelected = false): google.maps.Icon {
     const color =
       v === "friends" ? "#2563eb" :
       v === "group" ? "#7c3aed" :
       v === "private" ? "#6b7280" :
       "#00dbc1"; // public
 
+    const size = isSelected ? 36 : 28;
+    const anchorX = size / 2;
+    const anchorY = size;
+    const innerR = isSelected ? 3.2 : 2.6;
+    const stroke = isSelected ? "rgba(0,0,0,0.55)" : "rgba(0,0,0,0.35)";
+
     const svg = `<?xml version="1.0" encoding="UTF-8"?>
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
-    <path d="M12 22s7-4.35 7-11a7 7 0 1 0-14 0c0 6.65 7 11 7 11z" fill="${color}"/>
-    <circle cx="12" cy="11" r="2.6" fill="white" fill-opacity="0.9"/>
+  <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24">
+    <path d="M12 22s7-4.35 7-11a7 7 0 1 0-14 0c0 6.65 7 11 7 11z" fill="${color}" stroke="${stroke}" stroke-width="1.2"/>
+    <circle cx="12" cy="11" r="${innerR}" fill="white" fill-opacity="0.95"/>
   </svg>`;
 
     return {
       url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
-      scaledSize: new google.maps.Size(28, 28),
-      anchor: new google.maps.Point(14, 28),
+      scaledSize: new google.maps.Size(size, size),
+      anchor: new google.maps.Point(anchorX, anchorY),
     };
   }
 
@@ -548,6 +661,50 @@ export default function HomePage() {
     }
 
     resetFilterSheetDrag();
+  }
+
+  // Spot sheet drag helpers
+  function onSpotSheetTouchStart(e: React.TouchEvent<HTMLDivElement>) {
+    const y = e.touches[0]?.clientY;
+    if (typeof y !== "number") return;
+    spotTouchStartYRef.current = y;
+    spotTouchCurrentYRef.current = y;
+  }
+
+  function onSpotSheetTouchMove(e: React.TouchEvent<HTMLDivElement>) {
+    if (spotTouchStartYRef.current == null) return;
+
+    const y = e.touches[0]?.clientY;
+    if (typeof y !== "number") return;
+
+    spotTouchCurrentYRef.current = y;
+    const delta = y - spotTouchStartYRef.current;
+
+    // Only drag downward
+    setSpotSheetDragY(delta > 0 ? delta : 0);
+  }
+
+  function resetSpotSheetDrag() {
+    spotTouchStartYRef.current = null;
+    spotTouchCurrentYRef.current = null;
+    setSpotSheetDragY(0);
+  }
+
+  function onSpotSheetTouchEnd() {
+    const startY = spotTouchStartYRef.current;
+    const endY = spotTouchCurrentYRef.current;
+
+    const delta =
+      typeof startY === "number" && typeof endY === "number"
+        ? endY - startY
+        : 0;
+
+    // If user dragged far enough, close the sheet
+    if (delta > 120) {
+      setSelected(null);
+    }
+
+    resetSpotSheetDrag();
   }
 
   return (
@@ -648,8 +805,9 @@ export default function HomePage() {
             className="ots-filters-btn"
             type="button"
             onClick={() => setShowFilters(true)}
+            title={filterSummary ?? "Filters"}
           >
-            Filters
+            {filterSummary ? `Filters • ${filterSummary}` : "Filters"}
           </button>
         </div>
       }
@@ -1179,7 +1337,47 @@ export default function HomePage() {
       )}
 
       {/* MAIN CONTENT */}
-      <div style={{ height: "100%", display: "flex", minHeight: 0 }}>
+      <div style={{ height: "100%", display: "flex", minHeight: 0, flexDirection: "column" }}>
+        {isMobile && (
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              overflowX: "auto",
+              padding: "8px 12px 6px",
+              background: "rgba(255,255,255,0.92)",
+              backdropFilter: "blur(8px)",
+              borderBottom: "1px solid rgba(0,0,0,0.06)",
+              WebkitOverflowScrolling: "touch",
+            }}
+          >
+            {mobileQuickChips.map((chip) => (
+              <button
+                key={chip.key}
+                type="button"
+                onClick={chip.onClick}
+                style={{
+                  flex: "0 0 auto",
+                  padding: "8px 12px",
+                  borderRadius: 999,
+                  border: chip.active
+                    ? "1px solid rgba(0,0,0,0.22)"
+                    : "1px solid rgba(0,0,0,0.12)",
+                  background: chip.active ? "rgba(0,255,251,0.16)" : "white",
+                  color: "#111",
+                  fontWeight: chip.active ? 800 : 700,
+                  cursor: "pointer",
+                  boxShadow: chip.active ? "0 4px 12px rgba(0,0,0,0.08)" : "none",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div style={{ height: "100%", display: "flex", minHeight: 0 }}>
         <div
           className="ots-layout"
           style={{
@@ -1213,10 +1411,8 @@ export default function HomePage() {
             >
               <div
                 style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: 10,
+                  display: "grid",
+                  gap: 8,
                   marginBottom: isMobile && !mobileListOpen ? 0 : 10,
                   position: isMobile ? "sticky" : undefined,
                   top: isMobile ? 0 : undefined,
@@ -1227,27 +1423,89 @@ export default function HomePage() {
                 }}
                 onClick={isMobile ? () => setMobileListOpen((v) => !v) : undefined}
               >
-                <div>
-                  <h3 style={{ margin: 0 }}>Nearby Spots</h3>
+                {isMobile && (
+                  <div
+                    style={{
+                      width: 40,
+                      height: 4,
+                      borderRadius: 999,
+                      background: "rgba(0,0,0,0.18)",
+                      margin: "0 auto",
+                    }}
+                  />
+                )}
+
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 10,
+                  }}
+                >
+                  <div>
+                    <h3 style={{ margin: 0 }}>Nearby Spots</h3>
+                    {isMobile && (
+                      <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
+                        {filteredSpots.length} found nearby {mobileListOpen ? "" : "• tap to expand"}
+                      </div>
+                    )}
+                  </div>
+
                   {isMobile && (
-                    <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
-                      {filteredSpots.length} found nearby {mobileListOpen ? "" : "• tap to expand"}
-                    </div>
+                    <button
+                      type="button"
+                      className="ots-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMobileListOpen((v) => !v);
+                      }}
+                      style={{ padding: "8px 10px", borderRadius: 999 }}
+                    >
+                      {mobileListOpen ? "Hide" : "Show"}
+                    </button>
                   )}
                 </div>
 
-                {isMobile && (
-                  <button
-                    type="button"
-                    className="ots-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setMobileListOpen((v) => !v);
+                {isMobile && !mobileListOpen && filteredSpots.length > 0 && (
+                  <div
+                    className="ots-surface ots-surface--border"
+                    style={{
+                      padding: 10,
+                      borderRadius: 12,
+                      display: "grid",
+                      gap: 6,
                     }}
-                    style={{ padding: "8px 10px", borderRadius: 999 }}
                   >
-                    {mobileListOpen ? "Hide" : "Show"}
-                  </button>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: 8,
+                        alignItems: "start",
+                      }}
+                    >
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 800, color: "#111", lineHeight: 1.2 }}>
+                          {filteredSpots[0].title}
+                        </div>
+                        <TagPills tags={filteredSpots[0].tags} max={2} />
+                        <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
+                          {filteredSpots[0].what3words ? `///${filteredSpots[0].what3words}` : "Tap to browse nearby stories"}
+                        </div>
+                      </div>
+
+                      <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.8, whiteSpace: "nowrap" }}>
+                        {formatDistance(filteredSpots[0].distance_m)}
+                      </div>
+                    </div>
+
+                    <div style={{ fontSize: 13, opacity: 0.8 }}>
+                      {filteredSpots[0].description.length > 70
+                        ? filteredSpots[0].description.slice(0, 70) + "…"
+                        : filteredSpots[0].description}
+                    </div>
+                  </div>
                 )}
               </div>
 
@@ -1290,9 +1548,12 @@ export default function HomePage() {
                               alignItems: "start",
                             }}
                           >
-                            <div style={{ display: "flex", gap: 8, alignItems: "center", minWidth: 0 }}>
-                              <strong style={{ lineHeight: 1.2 }}>{s.title}</strong>
-                              <VisibilityBadge visibility={s.visibility} />
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <div style={{ display: "flex", gap: 8, alignItems: "center", minWidth: 0 }}>
+                                <strong style={{ lineHeight: 1.2 }}>{s.title}</strong>
+                                <VisibilityBadge visibility={s.visibility} />
+                              </div>
+                              <TagPills tags={s.tags} max={3} />
                             </div>
 
                             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -1398,10 +1659,10 @@ export default function HomePage() {
                   key={s.id}
                   position={{ lat: s.lat_out, lng: s.lng_out }}
                   title={s.title}
-                  icon={markerIconForVisibility((s as any).visibility)}
+                  icon={markerIconForVisibility((s as any).visibility, selected?.id === s.id)}
+                  zIndex={selected?.id === s.id ? 1000 : undefined}
                   onClick={() => {
-                    setSelected(s);
-                    if (map) map.panTo({ lat: s.lat_out, lng: s.lng_out });
+                    selectSpot(s);
                   }}
                 />
               ))}
@@ -1417,6 +1678,9 @@ export default function HomePage() {
             {selected && (
               <div
                 className="ots-surface ots-surface--shadow"
+                onTouchStart={onSpotSheetTouchStart}
+                onTouchMove={onSpotSheetTouchMove}
+                onTouchEnd={onSpotSheetTouchEnd}
                 style={{
                   position: "absolute",
                   left: 0,
@@ -1428,6 +1692,8 @@ export default function HomePage() {
                   maxHeight: "60vh",
                   overflowY: "auto",
                   boxShadow: "0 -10px 40px rgba(0,0,0,0.25)",
+                  transform: spotSheetDragY ? `translateY(${spotSheetDragY}px)` : undefined,
+                  transition: spotSheetDragY ? "none" : "transform 180ms ease",
                 }}
               >
                 <div
@@ -1441,9 +1707,12 @@ export default function HomePage() {
                 />
 
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "start" }}>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", minWidth: 0 }}>
-                    <h3 style={{ margin: 0 }}>{selected.title}</h3>
-                    <VisibilityBadge visibility={selected.visibility} />
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", minWidth: 0 }}>
+                      <h3 style={{ margin: 0 }}>{selected.title}</h3>
+                      <VisibilityBadge visibility={selected.visibility} />
+                    </div>
+                    <TagPills tags={selected.tags} max={6} />
                   </div>
 
                   <button
@@ -1549,6 +1818,7 @@ export default function HomePage() {
             </Link>
           </div>
         </div>
+      </div>
       </div>
     </AppShell>
   );

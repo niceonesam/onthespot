@@ -36,6 +36,7 @@ const [loadingCategories, setLoadingCategories] = useState(false);
   const w3wToCoordsCacheRef = useRef(
     new Map<string, { lat: number; lng: number }>()
   );
+  const hasAutoAdvancedStep1Ref = useRef(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [loadingW3w, setLoadingW3w] = useState(false);
 
@@ -59,7 +60,7 @@ const [loadingCategories, setLoadingCategories] = useState(false);
   const [groupId, setGroupId] = useState<string>("");
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [showOtherDetails, setShowOtherDetails] = useState(false);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
 
   useEffect(() => {
   const latParam = searchParams.get("lat");
@@ -430,6 +431,31 @@ const [loadingCategories, setLoadingCategories] = useState(false);
     }
   }
 
+  function canContinueFromStep1() {
+    return Boolean(pos);
+  }
+
+  function confirmLocationAndMaybeAdvance(auto = false) {
+    if (!canContinueFromStep1()) return;
+    if (auto && hasAutoAdvancedStep1Ref.current) return;
+
+    if (auto) {
+      hasAutoAdvancedStep1Ref.current = true;
+    }
+
+    setStep(2);
+  }
+
+  function canContinueFromStep2() {
+    return Boolean(title.trim() && description.trim() && category);
+  }
+
+  function stepTitle() {
+    if (step === 1) return "Step 1 of 3 — Choose location";
+    if (step === 2) return "Step 2 of 3 — Tell the story";
+    return "Step 3 of 3 — Extras";
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setMsg(null);
@@ -536,307 +562,354 @@ const [loadingCategories, setLoadingCategories] = useState(false);
       </p>
 
       <form onSubmit={submit} style={{ display: "grid", gap: 14, marginTop: 18 }}>
-        {/* 1. Main story fields first */}
-        <div className="ots-surface ots-surface--border" style={{ padding: 14 }}>
-          <div style={{ fontWeight: 800, color: "#111", marginBottom: 10 }}>
-            Main details
+        <div className="ots-surface ots-surface--border" style={{ padding: 12 }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: "#00a99a", letterSpacing: 0.2 }}>
+            {stepTitle()}
           </div>
 
-          <div style={{ display: "grid", gap: 12 }}>
-            <label style={{ display: "grid", gap: 6 }}>
-              <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Title</span>
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Give this spot a short title"
-                required
-                style={{
-                  padding: 10,
-                  borderRadius: 12,
-                  border: "1px solid rgba(0,0,0,0.2)",
-                }}
-              />
-            </label>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 10 }}>
+            {[1, 2, 3].map((n) => {
+              const active = step === n;
+              const done = step > n;
+              return (
+                <div
+                  key={n}
+                  style={{
+                    height: 8,
+                    borderRadius: 999,
+                    background: active || done ? "rgba(0,255,251,0.35)" : "rgba(0,0,0,0.08)",
+                    border: active ? "1px solid rgba(0,0,0,0.18)" : "1px solid transparent",
+                  }}
+                />
+              );
+            })}
+          </div>
+        </div>
 
-            <label style={{ display: "grid", gap: 6 }}>
-              <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Description</span>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="What happened on this exact spot?"
-                rows={6}
-                required
-                style={{
-                  padding: 10,
-                  borderRadius: 12,
-                  border: "1px solid rgba(0,0,0,0.2)",
-                  resize: "vertical",
-                }}
-              />
-            </label>
-
-            <label style={{ display: "grid", gap: 6 }}>
-              <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Category</span>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                disabled={loadingCategories || categories.length === 0}
-                style={{
-                  padding: 10,
-                  borderRadius: 12,
-                  border: "1px solid rgba(0,0,0,0.2)",
-                }}
-              >
-                {!category ? (
-                  <option value="">
-                    {loadingCategories
-                      ? "Loading categories…"
-                      : categories.length
-                        ? "Select a category"
-                        : "No categories available"}
-                  </option>
-                ) : null}
-
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-
-              <div style={{ fontSize: 12, color: "#666" }}>
-                Pick the main theme of this spot. You’ll be able to filter by it later.
+        {step === 1 && (
+          <div className="ots-surface ots-surface--border" style={{ padding: 14 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 12,
+                flexWrap: "wrap",
+                marginBottom: 10,
+              }}
+            >
+              <div>
+                <div style={{ fontWeight: 800, color: "#111" }}>Where is the spot?</div>
+                <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
+                  Drag the pin or tap the map to place the spot exactly.
+                </div>
               </div>
 
-              {categories.length === 0 && !loadingCategories ? (
-                <div style={{ marginTop: 6, opacity: 0.75, fontSize: 13 }}>
-                  No categories found. Check RLS/policies on <code>spot_categories</code>.
-                </div>
-              ) : null}
-            </label>
-            <label style={{ display: "grid", gap: 6 }}>
-              <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Tags (optional)</span>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  className="ots-btn"
+                  onClick={() => {
+                    navigator.geolocation.getCurrentPosition(
+                      (p) => setPos({ lat: p.coords.latitude, lng: p.coords.longitude }),
+                      () => setMsg("Could not read your GPS location.")
+                    );
+                  }}
+                >
+                  Use my location
+                </button>
 
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                <button
+                  type="button"
+                  className="ots-btn"
+                  onClick={() => setPos({ lat: 51.5074, lng: -0.1278 })}
+                >
+                  Reset to London
+                </button>
+              </div>
+            </div>
+
+            {w3wAvailable && (
+              <div
+                style={{
+                  marginBottom: 12,
+                  display: "flex",
+                  gap: 8,
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                }}
+              >
                 <input
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
+                  value={w3wInput}
+                  onChange={(e) => setW3wInput(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === ",") {
+                    if (e.key === "Enter") {
                       e.preventDefault();
-                      addTag(tagInput);
-                    }
-                    if (e.key === "Tab" && tagSuggestions.length > 0) {
-                      e.preventDefault();
-                      addTag(tagSuggestions[0]);
+                      jumpToWhat3Words();
                     }
                   }}
-                  placeholder="Add tags like history, war, london"
+                  placeholder="what3words e.g. ///filled.count.soap"
                   style={{
-                    flex: "1 1 280px",
+                    flex: "1 1 320px",
                     padding: 10,
                     borderRadius: 12,
                     border: "1px solid rgba(0,0,0,0.2)",
                   }}
                 />
-                <button
-                  type="button"
-                  className="ots-btn"
-                  onClick={() => addTag(tagInput)}
-                  disabled={!tagInput.trim()}
-                >
-                  Add tag
+                <button type="button" className="ots-btn" onClick={jumpToWhat3Words} disabled={jumping}>
+                  {jumping ? "Going…" : "Go"}
                 </button>
               </div>
+            )}
 
-              <div style={{ fontSize: 12, color: "#666" }}>
-                Use multiple tags for people, themes, eras, places, or events. Press Enter or comma to add one, or Tab to accept the first suggestion.
-              </div>
+            {!w3wAvailable && (
+              <p style={{ opacity: 0.7, marginTop: 0, marginBottom: 12 }}>
+                what3words search unavailable — use the map to set the exact spot.
+              </p>
+            )}
 
-              {(loadingTagSuggestions || tagSuggestions.length > 0) && (
-                <div style={{ display: "grid", gap: 6 }}>
-                  <div style={{ fontSize: 12, color: "#666" }}>
-                    {loadingTagSuggestions ? "Looking for matching tags…" : "Suggestions"}
-                  </div>
-
-                  {!loadingTagSuggestions && tagSuggestions.length > 0 && (
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      {tagSuggestions.map((tag) => (
-                        <button
-                          key={tag}
-                          type="button"
-                          className="ots-btn"
-                          onClick={() => addTag(tag)}
-                          style={{
-                            padding: "6px 10px",
-                            borderRadius: 999,
-                            fontWeight: 700,
-                          }}
-                        >
-                          #{tag}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {tags.length > 0 && (
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 2 }}>
-                  {tags.map((tag) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() => removeTag(tag)}
-                      style={{
-                        padding: "6px 10px",
-                        borderRadius: 999,
-                        border: "1px solid rgba(0,0,0,0.15)",
-                        background: "rgba(0,255,251,0.08)",
-                        cursor: "pointer",
-                        color: "#111",
-                        fontWeight: 700,
-                      }}
-                      title={`Remove ${tag}`}
-                    >
-                      #{tag} ×
-                    </button>
-                  ))}
-                </div>
-              )}
-            </label>
-          </div>
-        </div>
-
-        {/* 2. Map / location next */}
-        <div className="ots-surface ots-surface--border" style={{ padding: 14 }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: 12,
-              flexWrap: "wrap",
-              marginBottom: 10,
-            }}
-          >
-            <div>
-              <div style={{ fontWeight: 800, color: "#111" }}>Location</div>
-              <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
-                Drag the pin or click the map to place the spot exactly.
-              </div>
-            </div>
-
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button
-                type="button"
-                className="ots-btn"
-                onClick={() => {
-                  navigator.geolocation.getCurrentPosition(
-                    (p) => setPos({ lat: p.coords.latitude, lng: p.coords.longitude }),
-                    () => setMsg("Could not read your GPS location.")
-                  );
-                }}
-              >
-                Use my current location
-              </button>
-
-              <button
-                type="button"
-                className="ots-btn"
-                onClick={() => setPos({ lat: 51.5074, lng: -0.1278 })}
-              >
-                Reset to London (demo)
-              </button>
-            </div>
-          </div>
-
-          {w3wAvailable && (
-            <div
-              style={{
-                marginBottom: 12,
-                display: "flex",
-                gap: 8,
-                flexWrap: "wrap",
-                alignItems: "center",
-              }}
-            >
-              <input
-                value={w3wInput}
-                onChange={(e) => setW3wInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    jumpToWhat3Words();
-                  }
-                }}
-                placeholder="what3words e.g. ///filled.count.soap"
-                style={{
-                  flex: "1 1 320px",
-                  padding: 10,
-                  borderRadius: 12,
-                  border: "1px solid rgba(0,0,0,0.2)",
-                }}
-              />
-              <button type="button" className="ots-btn" onClick={jumpToWhat3Words} disabled={jumping}>
-                {jumping ? "Going…" : "Go"}
-              </button>
-            </div>
-          )}
-
-          {!w3wAvailable && (
-            <p style={{ opacity: 0.7, marginTop: 0, marginBottom: 12 }}>
-              what3words search unavailable — use the map to set the exact spot.
-            </p>
-          )}
-
-          <div style={{ height: 360, borderRadius: 12, overflow: "hidden" }}>
-            <GoogleMap
-              mapContainerStyle={{ width: "100%", height: "100%" }}
-              center={pos}
-              zoom={16}
-              options={{ streetViewControl: false, mapTypeControl: false }}
-              onLoad={(m) => setMap(m)}
-              onClick={(e) => {
-                const lat = e.latLng?.lat();
-                const lng = e.latLng?.lng();
-                if (lat != null && lng != null) setPos({ lat, lng });
-              }}
-            >
-              <MarkerF
-                position={pos}
-                draggable
-                onDragEnd={(e) => {
+            <div style={{ height: 360, borderRadius: 12, overflow: "hidden" }}>
+              <GoogleMap
+                mapContainerStyle={{ width: "100%", height: "100%" }}
+                center={pos}
+                zoom={16}
+                options={{ streetViewControl: false, mapTypeControl: false }}
+                onLoad={(m) => setMap(m)}
+                onClick={(e) => {
                   const lat = e.latLng?.lat();
                   const lng = e.latLng?.lng();
-                  if (lat != null && lng != null) setPos({ lat, lng });
+                  if (lat != null && lng != null) {
+                    setPos({ lat, lng });
+                    window.setTimeout(() => confirmLocationAndMaybeAdvance(true), 0);
+                  }
                 }}
-              />
-            </GoogleMap>
+              >
+                <MarkerF
+                  position={pos}
+                  draggable
+                  onDragEnd={(e) => {
+                    const lat = e.latLng?.lat();
+                    const lng = e.latLng?.lng();
+                    if (lat != null && lng != null) {
+                      setPos({ lat, lng });
+                      window.setTimeout(() => confirmLocationAndMaybeAdvance(true), 0);
+                    }
+                  }}
+                />
+              </GoogleMap>
+            </div>
+
+            <div
+              className="ots-surface ots-surface--border"
+              style={{ padding: 12, marginTop: 12, display: "grid", gap: 6 }}
+            >
+              <div style={{ fontWeight: 700, color: "#111" }}>Chosen location</div>
+              <div style={{ fontSize: 13, color: "#333" }}>
+                {pos.lat.toFixed(6)}, {pos.lng.toFixed(6)}
+              </div>
+              <div style={{ fontSize: 13, color: "#666" }}>
+                {loadingW3w ? "Looking up what3words…" : w3w ? `///${w3w}` : "No what3words available"}
+              </div>
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* 3. Secondary details hidden by default */}
-        <div className="ots-surface ots-surface--border" style={{ padding: 14 }}>
-          <button
-            type="button"
-            className="ots-btn"
-            onClick={() => setShowOtherDetails((v) => !v)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              width: "100%",
-              fontWeight: 800,
-              background: "white",
-            }}
-          >
-            <span>Other details</span>
-            <span aria-hidden="true">{showOtherDetails ? "▾" : "▸"}</span>
-          </button>
+        {step === 2 && (
+          <div className="ots-surface ots-surface--border" style={{ padding: 14 }}>
+            <div style={{ fontWeight: 800, color: "#111", marginBottom: 10 }}>
+              Tell the story
+            </div>
 
-          {showOtherDetails && (
-            <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
+            <div style={{ display: "grid", gap: 12 }}>
+              <label style={{ display: "grid", gap: 6 }}>
+                <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Title</span>
+                <input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Give this spot a short title"
+                  required
+                  style={{
+                    padding: 10,
+                    borderRadius: 12,
+                    border: "1px solid rgba(0,0,0,0.2)",
+                  }}
+                />
+              </label>
+
+              <label style={{ display: "grid", gap: 6 }}>
+                <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Description</span>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="What happened on this exact spot?"
+                  rows={6}
+                  required
+                  style={{
+                    padding: 10,
+                    borderRadius: 12,
+                    border: "1px solid rgba(0,0,0,0.2)",
+                    resize: "vertical",
+                  }}
+                />
+              </label>
+
+              <label style={{ display: "grid", gap: 6 }}>
+                <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Category</span>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  disabled={loadingCategories || categories.length === 0}
+                  style={{
+                    padding: 10,
+                    borderRadius: 12,
+                    border: "1px solid rgba(0,0,0,0.2)",
+                  }}
+                >
+                  {!category ? (
+                    <option value="">
+                      {loadingCategories
+                        ? "Loading categories…"
+                        : categories.length
+                          ? "Select a category"
+                          : "No categories available"}
+                    </option>
+                  ) : null}
+
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+
+                <div style={{ fontSize: 12, color: "#666" }}>
+                  Pick the main theme of this spot. You’ll be able to filter by it later.
+                </div>
+
+                {categories.length === 0 && !loadingCategories ? (
+                  <div style={{ marginTop: 6, opacity: 0.75, fontSize: 13 }}>
+                    No categories found. Check RLS/policies on <code>spot_categories</code>.
+                  </div>
+                ) : null}
+              </label>
+
+              <label style={{ display: "grid", gap: 6 }}>
+                <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Tags (optional)</span>
+
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <input
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === ",") {
+                        e.preventDefault();
+                        addTag(tagInput);
+                      }
+                      if (e.key === "Tab" && tagSuggestions.length > 0) {
+                        e.preventDefault();
+                        addTag(tagSuggestions[0]);
+                      }
+                    }}
+                    placeholder="Add tags like history, war, london"
+                    style={{
+                      flex: "1 1 280px",
+                      padding: 10,
+                      borderRadius: 12,
+                      border: "1px solid rgba(0,0,0,0.2)",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="ots-btn"
+                    onClick={() => addTag(tagInput)}
+                    disabled={!tagInput.trim()}
+                  >
+                    Add tag
+                  </button>
+                </div>
+
+                <div style={{ fontSize: 12, color: "#666" }}>
+                  Use multiple tags for people, themes, eras, places, or events. Press Enter or comma to add one, or Tab to accept the first suggestion.
+                </div>
+
+                {(loadingTagSuggestions || tagSuggestions.length > 0) && (
+                  <div style={{ display: "grid", gap: 6 }}>
+                    <div style={{ fontSize: 12, color: "#666" }}>
+                      {loadingTagSuggestions ? "Looking for matching tags…" : "Suggestions"}
+                    </div>
+
+                    {!loadingTagSuggestions && tagSuggestions.length > 0 && (
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        {tagSuggestions.map((tag) => (
+                          <button
+                            key={tag}
+                            type="button"
+                            className="ots-btn"
+                            onClick={() => addTag(tag)}
+                            style={{
+                              padding: "6px 10px",
+                              borderRadius: 999,
+                              fontWeight: 700,
+                            }}
+                          >
+                            #{tag}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {tags.length > 0 && (
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 2 }}>
+                    {tags.map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => removeTag(tag)}
+                        style={{
+                          padding: "6px 10px",
+                          borderRadius: 999,
+                          border: "1px solid rgba(0,0,0,0.15)",
+                          background: "rgba(0,255,251,0.08)",
+                          cursor: "pointer",
+                          color: "#111",
+                          fontWeight: 700,
+                        }}
+                        title={`Remove ${tag}`}
+                      >
+                        #{tag} ×
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </label>
+
+              <label style={{ display: "grid", gap: 6 }}>
+                <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Photo</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                  style={{
+                    padding: 10,
+                    borderRadius: 12,
+                    border: "1px solid rgba(0,0,0,0.2)",
+                    background: "white",
+                  }}
+                />
+              </label>
+            </div>
+          </div>
+        )}
+
+        {step === 3 && (
+          <div className="ots-surface ots-surface--border" style={{ padding: 14 }}>
+            <div style={{ fontWeight: 800, color: "#111", marginBottom: 10 }}>
+              Extras
+            </div>
+
+            <div style={{ display: "grid", gap: 12 }}>
               <label style={{ display: "grid", gap: 6 }}>
                 <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Date (optional)</span>
                 <input
@@ -936,29 +1009,69 @@ const [loadingCategories, setLoadingCategories] = useState(false);
                   ) : null}
                 </label>
               )}
-
-
-              <label style={{ display: "grid", gap: 6 }}>
-                <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Photo</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                  style={{
-                    padding: 10,
-                    borderRadius: 12,
-                    border: "1px solid rgba(0,0,0,0.2)",
-                    background: "white",
-                  }}
-                />
-              </label>
             </div>
+          </div>
+        )}
+
+        <div
+          style={{
+            display: "flex",
+            gap: 10,
+            flexWrap: "wrap",
+            position: "sticky",
+            bottom: 0,
+            padding: "12px 0 calc(12px + env(safe-area-inset-bottom, 0px))",
+            background:
+              "linear-gradient(180deg, rgba(255,255,255,0), rgba(255,255,255,0.96) 20%, rgba(255,255,255,1) 100%)",
+            zIndex: 5,
+          }}
+        >
+          {step > 1 && (
+            <button
+              type="button"
+              className="ots-btn"
+              onClick={() => setStep((prev) => (prev === 3 ? 2 : 1))}
+              style={{ flex: 1, minWidth: 140, fontWeight: 700 }}
+            >
+              Back
+            </button>
+          )}
+
+          {step === 1 && (
+            <button
+              type="button"
+              className="ots-btn"
+              onClick={() => confirmLocationAndMaybeAdvance(false)}
+              disabled={!canContinueFromStep1()}
+              style={{ flex: 1, minWidth: 180, fontWeight: 800 }}
+            >
+              Confirm location
+            </button>
+          )}
+
+          {step === 2 && (
+            <button
+              type="button"
+              className="ots-btn"
+              onClick={() => setStep(3)}
+              disabled={!canContinueFromStep2()}
+              style={{ flex: 1, minWidth: 180, fontWeight: 800 }}
+            >
+              Continue to extras
+            </button>
+          )}
+
+          {step === 3 && (
+            <button
+              type="submit"
+              className="ots-btn"
+              disabled={submitting}
+              style={{ flex: 1, minWidth: 180, fontWeight: 800 }}
+            >
+              {submitting ? "Publishing…" : "Publish Spot"}
+            </button>
           )}
         </div>
-
-        <button type="submit" className="ots-btn" disabled={submitting} style={{ fontWeight: 800 }}>
-          {submitting ? "Publishing…" : "Publish Spot"}
-        </button>
       </form>
 
       {msg && <p style={{ color: "crimson", marginTop: 12, whiteSpace: "pre-wrap" }}>{msg}</p>}
