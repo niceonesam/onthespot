@@ -1419,53 +1419,134 @@ export default function HomePage() {
                 className="ots-surface ots-surface--shadow"
                 style={{
                   position: "absolute",
-                  left: 12,
-                  bottom: 12,
-                  width: 360,
-                  maxWidth: "calc(100% - 24px)",
-                  padding: 12,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  borderTopLeftRadius: 18,
+                  borderTopRightRadius: 18,
+                  padding: 16,
+                  maxHeight: "60vh",
+                  overflowY: "auto",
+                  boxShadow: "0 -10px 40px rgba(0,0,0,0.25)",
                 }}
               >
+                <div
+                  style={{
+                    width: 40,
+                    height: 4,
+                    borderRadius: 999,
+                    background: "rgba(0,0,0,0.2)",
+                    margin: "0 auto 12px auto",
+                  }}
+                />
+
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "start" }}>
                   <div style={{ display: "flex", gap: 8, alignItems: "center", minWidth: 0 }}>
                     <h3 style={{ margin: 0 }}>{selected.title}</h3>
                     <VisibilityBadge visibility={selected.visibility} />
                   </div>
-                  <button onClick={() => setSelected(null)}>✕</button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelected(null)}
+                    style={{
+                      border: "none",
+                      background: "transparent",
+                      fontSize: 18,
+                      cursor: "pointer",
+                    }}
+                  >
+                    ✕
+                  </button>
                 </div>
 
                 {selected.photo_url && (
                   <img
                     src={selected.photo_url}
                     alt={selected.title}
-                    style={{ width: "100%", borderRadius: 10, marginTop: 8 }}
+                    style={{
+                      width: "100%",
+                      borderRadius: 12,
+                      marginTop: 10,
+                      maxHeight: 220,
+                      objectFit: "cover",
+                    }}
                   />
                 )}
 
-                {selected.date_start && <p style={{ opacity: 0.7 }}>{selected.date_start}</p>}
-
-                {selected.source_url && (
-                  <a href={selected.source_url} target="_blank" rel="noreferrer">
-                    Source
-                  </a>
+                {selected.date_start && (
+                  <p style={{ opacity: 0.7, marginTop: 6 }}>{selected.date_start}</p>
                 )}
 
-                <p style={{ marginTop: 8 }}>{selected.description}</p>
+                <p style={{ marginTop: 10 }}>{selected.description}</p>
 
                 <p style={{ opacity: 0.75, margin: "8px 0" }}>
                   {selected.what3words ? `///${selected.what3words}` : null}
                   {selected.distance_m ? ` • ${formatDistance(selected.distance_m)} away` : null}
                 </p>
 
-                <a
-                  href={`https://www.google.com/maps/dir/?api=1&destination=${selected.lat_out},${selected.lng_out}`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Navigate
-                </a>
+                <div style={{ display: "flex", gap: 12, marginTop: 10, flexWrap: "wrap" }}>
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${selected.lat_out},${selected.lng_out}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: 999,
+                      border: "1px solid rgba(0,0,0,0.2)",
+                      textDecoration: "none",
+                      color: "#111",
+                      fontWeight: 700,
+                    }}
+                  >
+                    Navigate
+                  </a>
+
+                  {selected.source_url && (
+                    <a
+                      href={selected.source_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        padding: "8px 12px",
+                        borderRadius: 999,
+                        border: "1px solid rgba(0,0,0,0.2)",
+                        textDecoration: "none",
+                        color: "#111",
+                        fontWeight: 700,
+                      }}
+                    >
+                      Source
+                    </a>
+                  )}
+                </div>
               </div>
             )}
+
+            <Link
+              href={addHref}
+              style={{
+                position: "absolute",
+                right: 16,
+                bottom: selected ? "70vh" : 16,
+                width: 56,
+                height: 56,
+                borderRadius: "50%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "#00dbc1",
+                color: "#111",
+                fontSize: 28,
+                fontWeight: 900,
+                textDecoration: "none",
+                boxShadow: "0 10px 28px rgba(0,0,0,0.25)",
+                zIndex: 50,
+              }}
+              title="Add Spot"
+            >
+              +
+            </Link>
           </div>
         </div>
       </div>
