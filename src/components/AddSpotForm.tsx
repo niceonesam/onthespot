@@ -55,6 +55,7 @@ const [loadingCategories, setLoadingCategories] = useState(false);
   const [groupId, setGroupId] = useState<string>("");
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [showOtherDetails, setShowOtherDetails] = useState(false);
 
   useEffect(() => {
   const latParam = searchParams.get("lat");
@@ -463,195 +464,332 @@ const [loadingCategories, setLoadingCategories] = useState(false);
         {loadingW3w ? "what3words…" : w3w ? `///${w3w}` : "no what3words"}
       </p>
 
-      {w3wAvailable && (
-        <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <input
-            value={w3wInput}
-            onChange={(e) => setW3wInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                jumpToWhat3Words();
-              }
-            }}
-            placeholder="what3words e.g. ///filled.count.soap"
-            style={{ flex: "1 1 320px" }}
-          />
-          <button type="button" onClick={jumpToWhat3Words} disabled={jumping}>
-            {jumping ? "Going…" : "Go"}
-          </button>
+      <form onSubmit={submit} style={{ display: "grid", gap: 14, marginTop: 18 }}>
+        {/* 1. Main story fields first */}
+        <div className="ots-surface ots-surface--border" style={{ padding: 14 }}>
+          <div style={{ fontWeight: 800, color: "#111", marginBottom: 10 }}>
+            Main details
+          </div>
+
+          <div style={{ display: "grid", gap: 12 }}>
+            <label style={{ display: "grid", gap: 6 }}>
+              <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Title</span>
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Give this spot a short title"
+                required
+                style={{
+                  padding: 10,
+                  borderRadius: 12,
+                  border: "1px solid rgba(0,0,0,0.2)",
+                }}
+              />
+            </label>
+
+            <label style={{ display: "grid", gap: 6 }}>
+              <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Description</span>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="What happened on this exact spot?"
+                rows={6}
+                required
+                style={{
+                  padding: 10,
+                  borderRadius: 12,
+                  border: "1px solid rgba(0,0,0,0.2)",
+                  resize: "vertical",
+                }}
+              />
+            </label>
+          </div>
         </div>
-      )}
 
-      {!w3wAvailable && (
-        <p style={{ opacity: 0.6, marginTop: 12 }}>
-          what3words search unavailable — use the map to set the exact spot.
-        </p>
-      )}
-
-      <div style={{ height: 360, borderRadius: 12, overflow: "hidden", marginTop: 12 }}>
-        <GoogleMap
-          mapContainerStyle={{ width: "100%", height: "100%" }}
-          center={pos}
-          zoom={16}
-          options={{ streetViewControl: false, mapTypeControl: false }}
-          onLoad={(m) => setMap(m)}
-          onClick={(e) => {
-            const lat = e.latLng?.lat();
-            const lng = e.latLng?.lng();
-            if (lat != null && lng != null) setPos({ lat, lng });
-          }}
-        >
-          <MarkerF
-            position={pos}
-            draggable
-            onDragEnd={(e) => {
-              const lat = e.latLng?.lat();
-              const lng = e.latLng?.lng();
-              if (lat != null && lng != null) setPos({ lat, lng });
+        {/* 2. Map / location next */}
+        <div className="ots-surface ots-surface--border" style={{ padding: 14 }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 12,
+              flexWrap: "wrap",
+              marginBottom: 10,
             }}
-          />
-        </GoogleMap>
-      </div>
-
-      <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-        <button
-          type="button"
-          onClick={() => {
-            navigator.geolocation.getCurrentPosition(
-              (p) => setPos({ lat: p.coords.latitude, lng: p.coords.longitude }),
-              () => setMsg("Could not read your GPS location.")
-            );
-          }}
-        >
-          Use my current location
-        </button>
-
-        <button type="button" onClick={() => setPos({ lat: 51.5074, lng: -0.1278 })}>
-          Reset to London (demo)
-        </button>
-      </div>
-
-      <form onSubmit={submit} style={{ display: "grid", gap: 12, marginTop: 18 }}>
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" required />
-
-        <textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="What happened on this exact spot?"
-          rows={5}
-          required
-        />
-
-        <label>
-          Date (optional)
-          <input
-            type="date"
-            value={dateStart}
-            onChange={(e) => setDateStart(e.target.value)}
-          />
-        </label>
-
-        <label>
-          Source URL (optional)
-          <input
-            type="url"
-            value={sourceUrl}
-            onChange={(e) => setSourceUrl(e.target.value)}
-            placeholder="https://..."
-          />
-        </label>
-
-        <label>
-          Confidence
-          <select value={confidence} onChange={(e)=>setConfidence(Number(e.target.value))}>
-            <option value={1}>1 — uncertain</option>
-            <option value={2}>2</option>
-            <option value={3}>3</option>
-            <option value={4}>4</option>
-            <option value={5}>5 — verified</option>
-          </select>
-        </label>
-
-        <label>
-          Visibility{" "}
-          <select
-            value={visibility}
-            onChange={(e) => setVisibility(e.target.value as any)}
           >
-            <option value="public">Public</option>
-            <option value="friends">Friends</option>
-            <option value="private">Private</option>
-            <option value="group">Group</option>
-          </select>
-        </label>
-
-        {visibility === "group" && (
-          <label>
-            Group{" "}
-            <select
-              value={groupId}
-              onChange={(e) => setGroupId(e.target.value)}
-              disabled={loadingGroups}
-            >
-              <option value="">
-                {loadingGroups
-                  ? "Loading groups…"
-                  : groups.length
-                    ? "Select a group"
-                    : "No groups found (join/permissions?)"}
-              </option>
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                </option>
-              ))}
-            </select>
-            {groups.length === 0 && !loadingGroups ? (
-              <div style={{ marginTop: 6, opacity: 0.75, fontSize: 13 }}>
-                Create a group from your Account page first, then come back here.
+            <div>
+              <div style={{ fontWeight: 800, color: "#111" }}>Location</div>
+              <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
+                Drag the pin or click the map to place the spot exactly.
               </div>
-            ) : null}
-          </label>
-        )}
-
-        <label>
-          Category{" "}
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            disabled={loadingCategories || categories.length === 0}
-          >
-            {!category ? (
-              <option value="">
-                {loadingCategories
-                  ? "Loading categories…"
-                  : categories.length
-                    ? "Select a category"
-                    : "No categories available"}
-              </option>
-            ) : null}
-
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.label}
-              </option>
-            ))}
-          </select>
-
-          {categories.length === 0 && !loadingCategories ? (
-            <div style={{ marginTop: 6, opacity: 0.75, fontSize: 13 }}>
-              No categories found. Check RLS/policies on <code>spot_categories</code>.
             </div>
-          ) : null}
-        </label>
 
-        <label>
-          Photo{" "}
-          <input type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-        </label>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className="ots-btn"
+                onClick={() => {
+                  navigator.geolocation.getCurrentPosition(
+                    (p) => setPos({ lat: p.coords.latitude, lng: p.coords.longitude }),
+                    () => setMsg("Could not read your GPS location.")
+                  );
+                }}
+              >
+                Use my current location
+              </button>
 
-        <button type="submit" disabled={submitting}>
+              <button
+                type="button"
+                className="ots-btn"
+                onClick={() => setPos({ lat: 51.5074, lng: -0.1278 })}
+              >
+                Reset to London (demo)
+              </button>
+            </div>
+          </div>
+
+          {w3wAvailable && (
+            <div
+              style={{
+                marginBottom: 12,
+                display: "flex",
+                gap: 8,
+                flexWrap: "wrap",
+                alignItems: "center",
+              }}
+            >
+              <input
+                value={w3wInput}
+                onChange={(e) => setW3wInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    jumpToWhat3Words();
+                  }
+                }}
+                placeholder="what3words e.g. ///filled.count.soap"
+                style={{
+                  flex: "1 1 320px",
+                  padding: 10,
+                  borderRadius: 12,
+                  border: "1px solid rgba(0,0,0,0.2)",
+                }}
+              />
+              <button type="button" className="ots-btn" onClick={jumpToWhat3Words} disabled={jumping}>
+                {jumping ? "Going…" : "Go"}
+              </button>
+            </div>
+          )}
+
+          {!w3wAvailable && (
+            <p style={{ opacity: 0.7, marginTop: 0, marginBottom: 12 }}>
+              what3words search unavailable — use the map to set the exact spot.
+            </p>
+          )}
+
+          <div style={{ height: 360, borderRadius: 12, overflow: "hidden" }}>
+            <GoogleMap
+              mapContainerStyle={{ width: "100%", height: "100%" }}
+              center={pos}
+              zoom={16}
+              options={{ streetViewControl: false, mapTypeControl: false }}
+              onLoad={(m) => setMap(m)}
+              onClick={(e) => {
+                const lat = e.latLng?.lat();
+                const lng = e.latLng?.lng();
+                if (lat != null && lng != null) setPos({ lat, lng });
+              }}
+            >
+              <MarkerF
+                position={pos}
+                draggable
+                onDragEnd={(e) => {
+                  const lat = e.latLng?.lat();
+                  const lng = e.latLng?.lng();
+                  if (lat != null && lng != null) setPos({ lat, lng });
+                }}
+              />
+            </GoogleMap>
+          </div>
+        </div>
+
+        {/* 3. Secondary details hidden by default */}
+        <div className="ots-surface ots-surface--border" style={{ padding: 14 }}>
+          <button
+            type="button"
+            className="ots-btn"
+            onClick={() => setShowOtherDetails((v) => !v)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              width: "100%",
+              fontWeight: 800,
+              background: "white",
+            }}
+          >
+            <span>Other details</span>
+            <span aria-hidden="true">{showOtherDetails ? "▾" : "▸"}</span>
+          </button>
+
+          {showOtherDetails && (
+            <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
+              <label style={{ display: "grid", gap: 6 }}>
+                <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Date (optional)</span>
+                <input
+                  type="date"
+                  value={dateStart}
+                  onChange={(e) => setDateStart(e.target.value)}
+                  style={{
+                    padding: 10,
+                    borderRadius: 12,
+                    border: "1px solid rgba(0,0,0,0.2)",
+                  }}
+                />
+              </label>
+
+              <label style={{ display: "grid", gap: 6 }}>
+                <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Source URL (optional)</span>
+                <input
+                  type="url"
+                  value={sourceUrl}
+                  onChange={(e) => setSourceUrl(e.target.value)}
+                  placeholder="https://..."
+                  style={{
+                    padding: 10,
+                    borderRadius: 12,
+                    border: "1px solid rgba(0,0,0,0.2)",
+                  }}
+                />
+              </label>
+
+              <label style={{ display: "grid", gap: 6 }}>
+                <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Confidence</span>
+                <select
+                  value={confidence}
+                  onChange={(e) => setConfidence(Number(e.target.value))}
+                  style={{
+                    padding: 10,
+                    borderRadius: 12,
+                    border: "1px solid rgba(0,0,0,0.2)",
+                  }}
+                >
+                  <option value={1}>1 — uncertain</option>
+                  <option value={2}>2</option>
+                  <option value={3}>3</option>
+                  <option value={4}>4</option>
+                  <option value={5}>5 — verified</option>
+                </select>
+              </label>
+
+              <label style={{ display: "grid", gap: 6 }}>
+                <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Visibility</span>
+                <select
+                  value={visibility}
+                  onChange={(e) => setVisibility(e.target.value as any)}
+                  style={{
+                    padding: 10,
+                    borderRadius: 12,
+                    border: "1px solid rgba(0,0,0,0.2)",
+                  }}
+                >
+                  <option value="public">Public</option>
+                  <option value="friends">Friends</option>
+                  <option value="private">Private</option>
+                  <option value="group">Group</option>
+                </select>
+              </label>
+
+              {visibility === "group" && (
+                <label style={{ display: "grid", gap: 6 }}>
+                  <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Group</span>
+                  <select
+                    value={groupId}
+                    onChange={(e) => setGroupId(e.target.value)}
+                    disabled={loadingGroups}
+                    style={{
+                      padding: 10,
+                      borderRadius: 12,
+                      border: "1px solid rgba(0,0,0,0.2)",
+                    }}
+                  >
+                    <option value="">
+                      {loadingGroups
+                        ? "Loading groups…"
+                        : groups.length
+                          ? "Select a group"
+                          : "No groups found (join/permissions?)"}
+                    </option>
+                    {groups.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name}
+                      </option>
+                    ))}
+                  </select>
+                  {groups.length === 0 && !loadingGroups ? (
+                    <div style={{ marginTop: 6, opacity: 0.75, fontSize: 13 }}>
+                      Create a group from your Account page first, then come back here.
+                    </div>
+                  ) : null}
+                </label>
+              )}
+
+              <label style={{ display: "grid", gap: 6 }}>
+                <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Category</span>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  disabled={loadingCategories || categories.length === 0}
+                  style={{
+                    padding: 10,
+                    borderRadius: 12,
+                    border: "1px solid rgba(0,0,0,0.2)",
+                  }}
+                >
+                  {!category ? (
+                    <option value="">
+                      {loadingCategories
+                        ? "Loading categories…"
+                        : categories.length
+                          ? "Select a category"
+                          : "No categories available"}
+                    </option>
+                  ) : null}
+
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+
+                {categories.length === 0 && !loadingCategories ? (
+                  <div style={{ marginTop: 6, opacity: 0.75, fontSize: 13 }}>
+                    No categories found. Check RLS/policies on <code>spot_categories</code>.
+                  </div>
+                ) : null}
+              </label>
+
+              <label style={{ display: "grid", gap: 6 }}>
+                <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Photo</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                  style={{
+                    padding: 10,
+                    borderRadius: 12,
+                    border: "1px solid rgba(0,0,0,0.2)",
+                    background: "white",
+                  }}
+                />
+              </label>
+            </div>
+          )}
+        </div>
+
+        <button type="submit" className="ots-btn" disabled={submitting} style={{ fontWeight: 800 }}>
           {submitting ? "Publishing…" : "Publish Spot"}
         </button>
       </form>
