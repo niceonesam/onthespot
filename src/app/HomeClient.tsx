@@ -142,6 +142,8 @@ export default function HomePage() {
   const [crosshairPulseKey, setCrosshairPulseKey] = useState(0);
 
   const [showFilters, setShowFilters] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileListOpen, setMobileListOpen] = useState(false);
   // New filters
   const [searchText, setSearchText] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -310,6 +312,27 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
+    const mq = window.matchMedia("(max-width: 768px)");
+
+    const apply = () => {
+      const mobile = mq.matches;
+      setIsMobile(mobile);
+      if (!mobile) setMobileListOpen(false);
+    };
+
+    apply();
+
+    const listener = () => apply();
+    if (mq.addEventListener) {
+      mq.addEventListener("change", listener);
+      return () => mq.removeEventListener("change", listener);
+    }
+
+    mq.addListener(listener);
+    return () => mq.removeListener(listener);
+  }, []);
+
+  useEffect(() => {
     if (!pos) return;
     (async () => {
       const { data, error } = await supabase.rpc("spots_nearby", {
@@ -413,6 +436,7 @@ export default function HomePage() {
 
   function selectSpot(s: Spot) {
     setSelected(s);
+    if (isMobile) setMobileListOpen(false);
 
     // Center the map on the selected spot
     if (map) {
@@ -1027,124 +1051,194 @@ export default function HomePage() {
       <div style={{ height: "100%", display: "flex", minHeight: 0 }}>
         <div
           className="ots-layout"
-          style={{ height: "100%", width: "100%", minHeight: 0 }}
+          style={{
+            height: "100%",
+            width: "100%",
+            minHeight: 0,
+            position: "relative",
+            display: isMobile ? "block" : undefined,
+          }}
         >
-          {/* Left panel: Nearby list */}
-          <aside className="ots-list ots-surface ots-surface--border">
-            <h3 style={{ marginTop: 0 }}>Nearby Spots</h3>
-
-            {filteredSpots.length === 0 ? (
-              <p style={{ opacity: 0.7 }}>No Spots found with these filters.</p>
-            ) : (
-              <div style={{ display: "grid", gap: 10 }}>
-                {filteredSpots.map((s) => (
-                  <div
-                    key={s.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => selectSpot(s)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        selectSpot(s);
-                      }
-                    }}
-                    style={{
-                      textAlign: "left",
-                      padding: 10,
-                      borderRadius: 12,
-                      border:
-                        selected?.id === s.id
-                          ? "2px solid black"
-                          : "1px solid rgba(0,0,0,0.12)",
-                      background:
-                        selected?.id === s.id ? "rgba(0,0,0,0.04)" : "white",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        gap: 8,
-                        alignItems: "start",
-                      }}
-                    >
-                      <div style={{ display: "flex", gap: 8, alignItems: "center", minWidth: 0 }}>
-                        <strong style={{ lineHeight: 1.2 }}>{s.title}</strong>
-                        <VisibilityBadge visibility={s.visibility} />
-                      </div>
-
-                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                        <span style={{ opacity: 0.75, whiteSpace: "nowrap" }}>
-                          {formatDistance(s.distance_m)}
-                        </span>
-
-                        {userId && s.user_id === userId && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteSpot(s);
-                            }}
-                            style={{
-                              padding: "4px 8px",
-                              borderRadius: 999,
-                              border: "1px solid rgba(0,0,0,0.2)",
-                              background: "white",
-                              cursor: "pointer",
-                            }}
-                            title="Delete this Spot"
-                          >
-                            Delete
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    <div style={{ opacity: 0.7, fontSize: 13, marginTop: 6 }}>
-                      {s.what3words ? `///${s.what3words}` : ""}
-                    </div>
-
-                    <div style={{ marginTop: 6, opacity: 0.85 }}>
-                      {s.description.length > 90
-                        ? s.description.slice(0, 90) + "…"
-                        : s.description}
-                    </div>
-
-                    <div style={{ marginTop: 8, opacity: 0.9, color: "#00dbc1" }}>
-                      <a
-                        href={`https://www.google.com/maps/dir/?api=1&destination=${s.lat_out},${s.lng_out}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        Navigate
-                      </a>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div style={{ marginTop: 12 }}>
-              <Link
-                href={addHref}
+          {/* Nearby list: desktop sidebar, mobile bottom sheet */}
+            <aside
+              className="ots-list ots-surface ots-surface--border"
+              style={
+                isMobile
+                  ? {
+                      position: "absolute",
+                      left: 8,
+                      right: 8,
+                      bottom: 8,
+                      zIndex: 20,
+                      height: mobileListOpen ? "min(46vh, 420px)" : 92,
+                      borderRadius: 16,
+                      boxShadow: "0 16px 40px rgba(0,0,0,0.22)",
+                      overflow: "hidden",
+                      background: "white",
+                      transition: "height 180ms ease",
+                    }
+                  : undefined
+              }
+            >
+              <div
                 style={{
-                  display: "block",
-                  textAlign: "center",
-                  padding: 12,
-                  borderRadius: 12,
-                  border: "1px solid rgba(0,0,0,0.2)",
-                  background: "white",
-                  textDecoration: "none",
-                  color: "#111",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 10,
+                  marginBottom: isMobile && !mobileListOpen ? 0 : 10,
+                  position: isMobile ? "sticky" : undefined,
+                  top: isMobile ? 0 : undefined,
+                  background: isMobile ? "white" : undefined,
+                  paddingTop: isMobile ? 4 : undefined,
+                  zIndex: isMobile ? 1 : undefined,
+                  cursor: isMobile ? "pointer" : undefined,
                 }}
+                onClick={isMobile ? () => setMobileListOpen((v) => !v) : undefined}
               >
-                + Add Spot
-              </Link>
-            </div>
-          </aside>
+                <div>
+                  <h3 style={{ margin: 0 }}>Nearby Spots</h3>
+                  {isMobile && (
+                    <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
+                      {filteredSpots.length} found nearby {mobileListOpen ? "" : "• tap to expand"}
+                    </div>
+                  )}
+                </div>
+
+                {isMobile && (
+                  <button
+                    type="button"
+                    className="ots-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMobileListOpen((v) => !v);
+                    }}
+                    style={{ padding: "8px 10px", borderRadius: 999 }}
+                  >
+                    {mobileListOpen ? "Hide" : "Show"}
+                  </button>
+                )}
+              </div>
+
+              {(!isMobile || mobileListOpen) && (
+                <div style={{ overflowY: "auto", maxHeight: isMobile ? "calc(46vh - 56px)" : undefined }}>
+                  {filteredSpots.length === 0 ? (
+                    <p style={{ opacity: 0.7 }}>No Spots found with these filters.</p>
+                  ) : (
+                    <div style={{ display: "grid", gap: 10 }}>
+                      {filteredSpots.map((s) => (
+                        <div
+                          key={s.id}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => selectSpot(s)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              selectSpot(s);
+                            }
+                          }}
+                          style={{
+                            textAlign: "left",
+                            padding: 10,
+                            borderRadius: 12,
+                            border:
+                              selected?.id === s.id
+                                ? "2px solid black"
+                                : "1px solid rgba(0,0,0,0.12)",
+                            background:
+                              selected?.id === s.id ? "rgba(0,0,0,0.04)" : "white",
+                            cursor: "pointer",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              gap: 8,
+                              alignItems: "start",
+                            }}
+                          >
+                            <div style={{ display: "flex", gap: 8, alignItems: "center", minWidth: 0 }}>
+                              <strong style={{ lineHeight: 1.2 }}>{s.title}</strong>
+                              <VisibilityBadge visibility={s.visibility} />
+                            </div>
+
+                            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                              <span style={{ opacity: 0.75, whiteSpace: "nowrap" }}>
+                                {formatDistance(s.distance_m)}
+                              </span>
+
+                              {userId && s.user_id === userId && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    deleteSpot(s);
+                                  }}
+                                  style={{
+                                    padding: "4px 8px",
+                                    borderRadius: 999,
+                                    border: "1px solid rgba(0,0,0,0.2)",
+                                    background: "white",
+                                    cursor: "pointer",
+                                  }}
+                                  title="Delete this Spot"
+                                >
+                                  Delete
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          <div style={{ opacity: 0.7, fontSize: 13, marginTop: 6 }}>
+                            {s.what3words ? `///${s.what3words}` : ""}
+                          </div>
+
+                          <div style={{ marginTop: 6, opacity: 0.85 }}>
+                            {s.description.length > 90
+                              ? s.description.slice(0, 90) + "…"
+                              : s.description}
+                          </div>
+
+                          <div style={{ marginTop: 8, opacity: 0.9, color: "#00dbc1" }}>
+                            <a
+                              href={`https://www.google.com/maps/dir/?api=1&destination=${s.lat_out},${s.lng_out}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              Navigate
+                            </a>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {!isMobile && (
+                    <div style={{ marginTop: 12 }}>
+                      <Link
+                        href={addHref}
+                        style={{
+                          display: "block",
+                          textAlign: "center",
+                          padding: 12,
+                          borderRadius: 12,
+                          border: "1px solid rgba(0,0,0,0.2)",
+                          background: "white",
+                          textDecoration: "none",
+                          color: "#111",
+                        }}
+                      >
+                        + Add Spot
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              )}
+            </aside>
+          
 
           {/* Right panel: Map */}
           <div className="ots-map">
