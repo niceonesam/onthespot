@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { GoogleMap, MarkerF, useLoadScript } from "@react-google-maps/api";
 import { getSupabaseBrowser } from "@/lib/supabase/browser";
 import Link from "next/link";
@@ -144,6 +144,9 @@ export default function HomePage() {
   const [showFilters, setShowFilters] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileListOpen, setMobileListOpen] = useState(false);
+  const filterTouchStartYRef = useRef<number | null>(null);
+  const filterTouchCurrentYRef = useRef<number | null>(null);
+  const [filterSheetDragY, setFilterSheetDragY] = useState(0);
   // New filters
   const [searchText, setSearchText] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -497,6 +500,54 @@ export default function HomePage() {
   function hideOnboardingForNow() {
     setShowOnboarding(false);
     setOnboardingStep(0);
+  }
+
+  function onFilterSheetTouchStart(e: React.TouchEvent<HTMLDivElement>) {
+    if (!isMobile) return;
+    const y = e.touches[0]?.clientY;
+    if (typeof y !== "number") return;
+    filterTouchStartYRef.current = y;
+    filterTouchCurrentYRef.current = y;
+  }
+
+  function onFilterSheetTouchMove(e: React.TouchEvent<HTMLDivElement>) {
+    if (!isMobile) return;
+    if (filterTouchStartYRef.current == null) return;
+
+    const y = e.touches[0]?.clientY;
+    if (typeof y !== "number") return;
+
+    filterTouchCurrentYRef.current = y;
+    const delta = y - filterTouchStartYRef.current;
+
+    // Only allow dragging downward
+    setFilterSheetDragY(delta > 0 ? delta : 0);
+  }
+
+  function resetFilterSheetDrag() {
+    filterTouchStartYRef.current = null;
+    filterTouchCurrentYRef.current = null;
+    setFilterSheetDragY(0);
+  }
+
+  function onFilterSheetTouchEnd() {
+    if (!isMobile) {
+      resetFilterSheetDrag();
+      return;
+    }
+
+    const startY = filterTouchStartYRef.current;
+    const endY = filterTouchCurrentYRef.current;
+    const delta =
+      typeof startY === "number" && typeof endY === "number"
+        ? endY - startY
+        : 0;
+
+    if (delta > 90) {
+      setShowFilters(false);
+    }
+
+    resetFilterSheetDrag();
   }
 
   return (
@@ -854,7 +905,17 @@ export default function HomePage() {
           className="ots-sheet-overlay"
           onClick={() => setShowFilters(false)} // tap outside closes
         >
-          <div className="ots-sheet" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="ots-sheet"
+            onClick={(e) => e.stopPropagation()}
+            onTouchStart={onFilterSheetTouchStart}
+            onTouchMove={onFilterSheetTouchMove}
+            onTouchEnd={onFilterSheetTouchEnd}
+            style={{
+              transform: filterSheetDragY ? `translateY(${filterSheetDragY}px)` : undefined,
+              transition: filterSheetDragY ? "none" : "transform 180ms ease",
+            }}
+          >
             <div className="ots-sheet-handle" />
 
             <div
@@ -866,182 +927,252 @@ export default function HomePage() {
               }}
             >
               <strong style={{ fontSize: 16, color: "#111" }}>Filters</strong>
-              <button
-                type="button"
-                onClick={() => setShowFilters(false)}
-                style={{
-                  padding: "6px 10px",
-                  borderRadius: 12,
-                  border: "1px solid rgba(0,0,0,0.2)",
-                  background: "white",
-                  cursor: "pointer",
-                }}
-              >
-                Done
-              </button>
             </div>
 
             <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
-              <label style={{ display: "grid", gap: 6 }}>
-                <span style={{ fontSize: 13, color: "#333" }}>Search</span>
-                <input
-                  value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
-                  placeholder="Title, description, what3words…"
+              <div
+                className="ots-surface ots-surface--border"
+                style={{ padding: 12, display: "grid", gap: 12 }}
+              >
+                <div style={{ fontWeight: 800, color: "#111" }}>Find spots</div>
+
+                <label style={{ display: "grid", gap: 6 }}>
+                  <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Search</span>
+                  <input
+                    value={searchText}
+                    onChange={(e) => setSearchText(e.target.value)}
+                    placeholder="Title, description, what3words…"
+                    style={{
+                      padding: 10,
+                      borderRadius: 12,
+                      border: "1px solid rgba(0,0,0,0.2)",
+                    }}
+                  />
+                </label>
+              </div>
+
+              <div
+                className="ots-surface ots-surface--border"
+                style={{ padding: 12, display: "grid", gap: 12 }}
+              >
+                <div style={{ fontWeight: 800, color: "#111" }}>Narrow results</div>
+
+                <label style={{ display: "grid", gap: 6 }}>
+                  <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Category</span>
+                  <select
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value)}
+                    style={{
+                      padding: 10,
+                      borderRadius: 12,
+                      border: "1px solid rgba(0,0,0,0.2)",
+                      background: "white",
+                    }}
+                  >
+                    <option value="all">All categories</option>
+                    {(categoriesLoaded ? categories : []).map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label style={{ display: "grid", gap: 6 }}>
+                  <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Visibility</span>
+                  <select
+                    value={visibilityFilter}
+                    onChange={(e) => setVisibilityFilter(e.target.value)}
+                    style={{
+                      padding: 10,
+                      borderRadius: 12,
+                      border: "1px solid rgba(0,0,0,0.2)",
+                      background: "white",
+                    }}
+                  >
+                    <option value="all">All visibility</option>
+                    <option value="public">Public</option>
+                    <option value="friends">Friends</option>
+                    <option value="group">Group</option>
+                    <option value="private">Private</option>
+                  </select>
+                </label>
+
+                <label style={{ display: "grid", gap: 6 }}>
+                  <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Radius</span>
+                  <select
+                    value={radiusM}
+                    onChange={(e) => setRadiusM(Number(e.target.value))}
+                    style={{
+                      padding: 10,
+                      borderRadius: 12,
+                      border: "1px solid rgba(0,0,0,0.2)",
+                      background: "white",
+                    }}
+                  >
+                    <option value={1000}>1 km</option>
+                    <option value={2500}>2.5 km</option>
+                    <option value={5000}>5 km</option>
+                    <option value={10000}>10 km</option>
+                    <option value={100000}>100 km</option>
+                    <option value={250000}>250 km</option>
+                    <option value={500000}>500 km</option>
+                    <option value={1000000}>1000 km</option>
+                  </select>
+                </label>
+
+                <label
                   style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
                     padding: 10,
                     borderRadius: 12,
-                    border: "1px solid rgba(0,0,0,0.2)",
+                    border: "1px solid rgba(0,0,0,0.08)",
+                    background: "rgba(0,0,0,0.02)",
                   }}
-                />
-              </label>
-
-              <label style={{ display: "grid", gap: 6 }}>
-                <span style={{ fontSize: 13, color: "#333" }}>Category</span>
-                <select
-                  value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value)}
                 >
-                  <option value="all">All</option>
-                  {(categoriesLoaded ? categories : []).map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#111" }}>Imported only</div>
+                    <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>
+                      Show only imported spots
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={importedOnly}
+                    onChange={(e) => setImportedOnly(e.target.checked)}
+                    style={{ width: 18, height: 18 }}
+                  />
+                </label>
+              </div>
 
-              <label style={{ display: "grid", gap: 6 }}>
-                <span style={{ fontSize: 13, color: "#333" }}>Visibility</span>
-                <select value={visibilityFilter} onChange={(e) => setVisibilityFilter(e.target.value)}>
-                  <option value="all">All</option>
-                  <option value="public">Public</option>
-                  <option value="friends">Friends</option>
-                  <option value="group">Group</option>
-                  <option value="private">Private</option>
-                </select>
-              </label>
-
-              <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <input
-                  type="checkbox"
-                  checked={importedOnly}
-                  onChange={(e) => setImportedOnly(e.target.checked)}
-                />
-                <span style={{ fontSize: 14, color: "#111" }}>
-                  Imported only
-                </span>
-              </label>
-
-              <label style={{ display: "grid", gap: 6 }}>
-                <span style={{ fontSize: 13, color: "#333" }}>Radius</span>
-                <select
-                  value={radiusM}
-                  onChange={(e) => setRadiusM(Number(e.target.value))}
-                >
-                  <option value={1000}>1 km</option>
-                  <option value={2500}>2.5 km</option>
-                  <option value={5000}>5 km</option>
-                  <option value={10000}>10 km</option>
-                  <option value={100000}>100 km</option>
-                  <option value={250000}>250 km</option>
-                  <option value={500000}>500 km</option>
-                  <option value={1000000}>1000 km</option>
-                </select>
-              </label>
-
-              {isAdmin && (
-                <div style={{ display: "grid", gap: 10 }}>
-                  <Link
-                    href="/admin/users"
-                    onClick={() => setShowFilters(false)}
-                    style={{
-                      display: "block",
-                      textAlign: "center",
-                      padding: 12,
-                      borderRadius: 12,
-                      border: "1px solid rgba(0,0,0,0.2)",
-                      background: "white",
-                      textDecoration: "none",
-                      color: "#111",
-                      fontWeight: 700,
-                    }}
-                  >
-                    Admin: Users
-                  </Link>
-
-                  <Link
-                    href="/admin/submissions"
-                    onClick={() => setShowFilters(false)}
-                    style={{
-                      display: "block",
-                      textAlign: "center",
-                      padding: 12,
-                      borderRadius: 12,
-                      border: "1px solid rgba(0,0,0,0.2)",
-                      background: "white",
-                      textDecoration: "none",
-                      color: "#111",
-                      fontWeight: 700,
-                    }}
-                  >
-                    Admin: Submissions
-                  </Link>
-                </div>
-              )}
-
-              <Link
-                href={addHref}
-                onClick={() => setShowFilters(false)}
-                style={{
-                  display: "block",
-                  textAlign: "center",
-                  padding: 12,
-                  borderRadius: 12,
-                  border: "1px solid rgba(0,0,0,0.2)",
-                  background: "white",
-                  textDecoration: "none",
-                  color: "#111",
-                  fontWeight: 700,
-                }}
+              <div
+                className="ots-surface ots-surface--border"
+                style={{ padding: 12, display: "grid", gap: 10 }}
               >
-                + Add Spot
-              </Link>
+                <div style={{ fontWeight: 800, color: "#111" }}>Quick actions</div>
 
-              <Link
-                href="/account"
-                onClick={() => setShowFilters(false)}
-                style={{
-                  display: "block",
-                  textAlign: "center",
-                  padding: 12,
-                  borderRadius: 12,
-                  border: "1px solid rgba(0,0,0,0.2)",
-                  background: "white",
-                  textDecoration: "none",
-                  color: "#111",
-                  fontWeight: 700,
-                }}
-              >
-                Account
-              </Link>
+                {isAdmin && (
+                  <div style={{ display: "grid", gap: 10 }}>
+                    <Link
+                      href="/admin/users"
+                      onClick={() => setShowFilters(false)}
+                      style={{
+                        display: "block",
+                        textAlign: "center",
+                        padding: 12,
+                        borderRadius: 12,
+                        border: "1px solid rgba(0,0,0,0.2)",
+                        background: "white",
+                        textDecoration: "none",
+                        color: "#111",
+                        fontWeight: 700,
+                      }}
+                    >
+                      Admin: Users
+                    </Link>
 
-              <form action="/auth/logout" method="post">
-                <button
-                  type="submit"
+                    <Link
+                      href="/admin/submissions"
+                      onClick={() => setShowFilters(false)}
+                      style={{
+                        display: "block",
+                        textAlign: "center",
+                        padding: 12,
+                        borderRadius: 12,
+                        border: "1px solid rgba(0,0,0,0.2)",
+                        background: "white",
+                        textDecoration: "none",
+                        color: "#111",
+                        fontWeight: 700,
+                      }}
+                    >
+                      Admin: Submissions
+                    </Link>
+                  </div>
+                )}
+
+                <Link
+                  href={addHref}
+                  onClick={() => setShowFilters(false)}
                   style={{
-                    width: "100%",
+                    display: "block",
+                    textAlign: "center",
                     padding: 12,
                     borderRadius: 12,
                     border: "1px solid rgba(0,0,0,0.2)",
                     background: "white",
-                    cursor: "pointer",
+                    textDecoration: "none",
+                    color: "#111",
                     fontWeight: 700,
                   }}
                 >
-                  Log out
+                  + Add Spot
+                </Link>
+
+                <Link
+                  href="/account"
+                  onClick={() => setShowFilters(false)}
+                  style={{
+                    display: "block",
+                    textAlign: "center",
+                    padding: 12,
+                    borderRadius: 12,
+                    border: "1px solid rgba(0,0,0,0.2)",
+                    background: "white",
+                    textDecoration: "none",
+                    color: "#111",
+                    fontWeight: 700,
+                  }}
+                >
+                  Account
+                </Link>
+
+                <form action="/auth/logout" method="post">
+                  <button
+                    type="submit"
+                    style={{
+                      width: "100%",
+                      padding: 12,
+                      borderRadius: 12,
+                      border: "1px solid rgba(0,0,0,0.2)",
+                      background: "white",
+                      cursor: "pointer",
+                      fontWeight: 700,
+                    }}
+                  >
+                    Log out
+                  </button>
+                </form>
+              </div>
+
+              <div style={{ display: "flex", gap: 10 }}>
+                <button
+                  type="button"
+                  className="ots-btn"
+                  onClick={() => {
+                    setSearchText("");
+                    setCategoryFilter("all");
+                    setVisibilityFilter("all");
+                    setImportedOnly(false);
+                    setRadiusM(2500);
+                  }}
+                  style={{ flex: 1, fontWeight: 700 }}
+                >
+                  Reset filters
                 </button>
-              </form>
+
+                <button
+                  type="button"
+                  className="ots-btn"
+                  onClick={() => setShowFilters(false)}
+                  style={{ flex: 1, fontWeight: 800 }}
+                >
+                  Show results
+                </button>
+              </div>
             </div>
           </div>
         </div>
