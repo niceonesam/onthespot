@@ -32,6 +32,7 @@ type MyGroup = {
   name: string;
   owner_id: string;
   my_role: string;
+  invite_code?: string;
 };
 
 export default function AccountPage() {
@@ -67,7 +68,7 @@ export default function AccountPage() {
   const [groups, setGroups] = useState<MyGroup[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [groupName, setGroupName] = useState("");
-  const [joinGroupId, setJoinGroupId] = useState("");
+  const [joinInviteCode, setJoinInviteCode] = useState("");
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [addMemberId, setAddMemberId] = useState<string>("");
   // User labels (resolve user_id -> email / name for nicer UI)
@@ -160,12 +161,15 @@ export default function AccountPage() {
       new Set((gm ?? []).map((r: any) => String(r.group_id)).filter(Boolean)),
     );
 
-    const groupsById = new Map<string, { id: string; name: string; owner_id: string }>();
+    const groupsById = new Map<
+      string,
+      { id: string; name: string; owner_id: string; invite_code: string }
+    >();
 
     if (groupIds.length > 0) {
       const { data: gRows, error: gErr } = await supabase
         .from("groups")
-        .select("id, name, owner_id")
+        .select("id, name, owner_id, invite_code")
         .in("id", groupIds);
 
       if (gErr) {
@@ -177,6 +181,7 @@ export default function AccountPage() {
             id,
             name: String(g.name ?? "(unnamed)"),
             owner_id: String(g.owner_id ?? ""),
+            invite_code: String(g.invite_code ?? ""),
           });
         });
       }
@@ -191,6 +196,7 @@ export default function AccountPage() {
           name: g?.name ?? "(unnamed)",
           owner_id: g?.owner_id ?? "",
           my_role: String(r.role ?? "member"),
+          invite_code: g?.invite_code ?? "",
         };
       })
       .filter((g, i, arr) => arr.findIndex((x) => x.id === g.id) === i);
@@ -750,6 +756,11 @@ export default function AccountPage() {
         return;
       }
 
+      if ((error as any)?.code === "23505") {
+        setMsg("That group name is already taken. Try a different name.");
+        return;
+      }
+
       const gid = String((data as any)?.id ?? "");
       if (!gid) {
         setMsg("Created group but did not get an id back.");
@@ -779,31 +790,34 @@ export default function AccountPage() {
       setMsg("Please sign in first.");
       return;
     }
-    const gid = joinGroupId.trim();
-    if (!gid) return;
+
+    const code = joinInviteCode.trim();
+    if (!code) return;
 
     setJoiningGroup(true);
     setMsg(null);
+
     try {
-      const { error } = await supabase
-        .from("group_members")
-        .insert({ group_id: gid, user_id: userId, role: "member" });
+      const { data, error } = await supabase.rpc("join_group_by_invite", {
+        p_invite_code: code,
+      });
 
       if (error) {
-        if (
-          (error as any)?.code === "23505" ||
-          error.message.toLowerCase().includes("duplicate")
-        ) {
-          setMsg("You are already a member of that group.");
+        // Friendly messages
+        if (error.message.toLowerCase().includes("invalid invite")) {
+          setMsg("That invite code doesn’t look right. Check it and try again.");
+        } else if (error.message.toLowerCase().includes("not authenticated")) {
+          setMsg("Please log in first.");
         } else {
           setMsg(error.message);
         }
         return;
       }
 
-      setJoinGroupId("");
+      const gid = String(data ?? "");
+      setJoinInviteCode("");
       await load();
-      setSelectedGroupId(gid);
+      if (gid) setSelectedGroupId(gid);
     } finally {
       setJoiningGroup(false);
     }
@@ -1185,9 +1199,9 @@ export default function AccountPage() {
               }}
             >
               <input
-                value={joinGroupId}
-                onChange={(e) => setJoinGroupId(e.target.value)}
-                placeholder="Join by Group ID (UUID, e.g. 081b2fac…2f01)"
+                value={joinInviteCode}
+                onChange={(e) => setJoinInviteCode(e.target.value)}
+                placeholder="Invite code (e.g. QKZP2ABC)"
                 style={{
                   padding: 10,
                   borderRadius: 12,
@@ -1199,9 +1213,9 @@ export default function AccountPage() {
                 type="button"
                 onClick={joinGroup}
                 className="ots-btn"
-                disabled={joiningGroup || !userId || !joinGroupId.trim()}
+                disabled={joiningGroup || !userId || !joinInviteCode.trim()}
               >
-                Join group
+                {joiningGroup ? "Joining…" : "Join group"}
               </button>
             </div>
 
@@ -1260,17 +1274,29 @@ export default function AccountPage() {
                           <div style={{ fontWeight: 700, color: "#111" }}>
                             {g.name}
                           </div>
+
                           <div style={{ fontSize: 12, opacity: 0.75 }}>
-                            id: <code title={g.id}>{prettyId(g.id)}</code>
+                            Invite code: <code>{g.invite_code}</code>
                           </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedGroupId(g.id)}
-                          className="ots-btn"
-                        >
-                          Select
-                        </button>
+
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button
+                            type="button"
+                            className="ots-btn"
+                            onClick={() => navigator.clipboard.writeText(g.invite_code || "")}
+                          >
+                            Copy
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setSelectedGroupId(g.id)}
+                            className="ots-btn"
+                          >
+                            Select
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
