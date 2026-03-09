@@ -157,6 +157,18 @@ function vibrateSuccess() {
   }
 }
 
+function dampedDrag(delta: number) {
+  if (!Number.isFinite(delta) || delta === 0) return 0;
+  const sign = delta < 0 ? -1 : 1;
+  const abs = Math.abs(delta);
+  const softened = abs <= 120 ? abs : 120 + (abs - 120) * 0.35;
+  return softened * sign;
+}
+
+function clamp<T extends number>(value: T, min: number, max: number) {
+  return Math.max(min, Math.min(max, value)) as T;
+}
+
 export default function HomePage() {
   const supabase = getSupabaseBrowser();
 
@@ -164,7 +176,6 @@ export default function HomePage() {
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
   });
 
-  const [sessionEmail, setSessionEmail] = useState<string | null>(null);
   const [pos, setPos] = useState<{ lat: number; lng: number } | null>(null);
   const [spots, setSpots] = useState<Spot[]>([]);
   const [selected, setSelected] = useState<Spot | null>(null);
@@ -179,6 +190,7 @@ export default function HomePage() {
   } | null>(null);
   const [crosshairPulseKey, setCrosshairPulseKey] = useState(0);
   const markerPulseTimeoutRef = useRef<number | null>(null);
+  const mapPanTimeoutRef = useRef<number | null>(null);
 
   const [showFilters, setShowFilters] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -322,6 +334,7 @@ export default function HomePage() {
     : null;
 
   const mobileListExpanded = mobileListSnap !== "peek";
+  const mobileSnapOrder: Array<"peek" | "half" | "full"> = ["peek", "half", "full"];
 
   function cycleMobileListSnap() {
     setMobileListSnap((prev) =>
@@ -361,7 +374,7 @@ export default function HomePage() {
     mobileListTouchCurrentYRef.current = y;
 
     const delta = y - mobileListTouchStartYRef.current;
-    setMobileListDragY(delta);
+    setMobileListDragY(dampedDrag(delta));
   }
 
   function onMobileListTouchEnd() {
@@ -377,11 +390,18 @@ export default function HomePage() {
         ? endY - startY
         : 0;
 
-    if (delta < -60) {
-      setMobileListSnap((prev) => (prev === "peek" ? "half" : "full"));
-      vibrateLight();
-    } else if (delta > 60) {
-      setMobileListSnap((prev) => (prev === "full" ? "half" : "peek"));
+    const currentIndex = mobileSnapOrder.indexOf(mobileListSnap);
+    let nextIndex = currentIndex;
+
+    if (delta <= -36) {
+      nextIndex = clamp(currentIndex + (delta <= -140 ? 2 : 1), 0, mobileSnapOrder.length - 1);
+    } else if (delta >= 36) {
+      nextIndex = clamp(currentIndex - (delta >= 140 ? 2 : 1), 0, mobileSnapOrder.length - 1);
+    }
+
+    const nextSnap = mobileSnapOrder[nextIndex];
+    if (nextSnap !== mobileListSnap) {
+      setMobileListSnap(nextSnap);
       vibrateLight();
     }
 
@@ -434,15 +454,12 @@ export default function HomePage() {
       try {
         const { data: sessionData } = await supabase.auth.getSession();
         const accessToken = sessionData.session?.access_token;
-        console.log("sessionData.session:", sessionData.session);  //TEMP
-        console.log("accessToken?", Boolean(accessToken));        //TEMP
 
         const res = await fetch("/api/me", {
           cache: "no-store",
           headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
         });
         if (!res.ok) {
-          setSessionEmail(null);
           setUserId(null);
           setIsAdmin(false);
           return;
@@ -454,11 +471,9 @@ export default function HomePage() {
           is_admin: boolean;
         };
 
-        setSessionEmail(j.email);
         setUserId(j.user_id);
         setIsAdmin(Boolean(j.is_admin));
       } catch (e: any) {
-        setSessionEmail(null);
         setUserId(null);
         setIsAdmin(false);
       }
@@ -513,6 +528,9 @@ export default function HomePage() {
     return () => {
       if (markerPulseTimeoutRef.current != null) {
         window.clearTimeout(markerPulseTimeoutRef.current);
+      }
+      if (mapPanTimeoutRef.current != null) {
+        window.clearTimeout(mapPanTimeoutRef.current);
       }
     };
   }, []);
@@ -584,8 +602,6 @@ export default function HomePage() {
     }
   }, [radiusM, searchText, categoryFilter, visibilityFilter, tagFilter, importedOnly]);
 
-  // (Filtering is now done in SQL; filteredSpots removed)
-
   if (!isLoaded || !pos) return <div style={{ padding: 16 }}>Loading…</div>;
 
   async function deleteSpot(spot: Spot) {
@@ -634,7 +650,12 @@ export default function HomePage() {
     markerPulseTimeoutRef.current = window.setTimeout(() => {
       setPulsingMarkerId((prev) => (prev === s.id ? null : prev));
       markerPulseTimeoutRef.current = null;
-    }, 220);
+    }, 260);
+
+    if (mapPanTimeoutRef.current != null) {
+      window.clearTimeout(mapPanTimeoutRef.current);
+      mapPanTimeoutRef.current = null;
+    }
 
     if (map) {
       map.panTo({ lat: s.lat_out, lng: s.lng_out });
@@ -643,9 +664,10 @@ export default function HomePage() {
       if (typeof z === "number" && z < 13) map.setZoom(13);
 
       if (isMobile) {
-        window.setTimeout(() => {
-          map.panBy(0, 120);
-        }, 140);
+        mapPanTimeoutRef.current = window.setTimeout(() => {
+          map.panBy(0, 136);
+          mapPanTimeoutRef.current = null;
+        }, 110);
       }
     }
   }
@@ -764,6 +786,12 @@ export default function HomePage() {
     resetFilterSheetDrag();
   }
 
+  const selectedSnapOrder: Array<"peek" | "half" | "full"> = ["peek", "half", "full"];
+
+  const selectedSheetIsPeek = selectedSheetSnap === "peek";
+  const selectedSheetIsHalf = selectedSheetSnap === "half";
+  const selectedSheetIsFull = selectedSheetSnap === "full";
+
   function selectedSheetHeightForSnap() {
     return selectedSheetSnap === "peek"
       ? 148
@@ -795,9 +823,7 @@ export default function HomePage() {
 
     spotTouchCurrentYRef.current = y;
     const delta = y - spotTouchStartYRef.current;
-
-    // Only drag downward
-    setSpotSheetDragY(delta > 0 ? delta : 0);
+    setSpotSheetDragY(dampedDrag(delta));
   }
 
   function resetSpotSheetDrag() {
@@ -815,20 +841,26 @@ export default function HomePage() {
         ? endY - startY
         : 0;
 
-    if (delta < -60) {
-      setSelectedSheetSnap((prev) => (prev === "peek" ? "half" : "full"));
+    const currentIndex = selectedSnapOrder.indexOf(selectedSheetSnap);
+
+    if (delta >= 160 && selectedSheetSnap === "peek") {
+      setSelected(null);
       vibrateLight();
-    } else if (delta > 60) {
-      if (selectedSheetSnap === "full") {
-        setSelectedSheetSnap("half");
-        vibrateLight();
-      } else if (selectedSheetSnap === "half") {
-        setSelectedSheetSnap("peek");
-        vibrateLight();
-      } else {
-        setSelected(null);
-        vibrateLight();
-      }
+      resetSpotSheetDrag();
+      return;
+    }
+
+    let nextIndex = currentIndex;
+    if (delta <= -36) {
+      nextIndex = clamp(currentIndex + (delta <= -140 ? 2 : 1), 0, selectedSnapOrder.length - 1);
+    } else if (delta >= 36) {
+      nextIndex = clamp(currentIndex - (delta >= 140 ? 2 : 1), 0, selectedSnapOrder.length - 1);
+    }
+
+    const nextSnap = selectedSnapOrder[nextIndex];
+    if (nextSnap !== selectedSheetSnap) {
+      setSelectedSheetSnap(nextSnap);
+      vibrateLight();
     }
 
     resetSpotSheetDrag();
@@ -1635,7 +1667,8 @@ export default function HomePage() {
                       boxShadow: "0 16px 40px rgba(0,0,0,0.22)",
                       overflow: "hidden",
                       background: "white",
-                      transition: mobileListDragY ? "none" : "height 240ms cubic-bezier(0.22, 1, 0.36, 1)",
+                      transition: mobileListDragY ? "none" : "height 320ms cubic-bezier(0.16, 1, 0.3, 1)",
+                      willChange: "height",
                     }
                   : undefined
               }
@@ -1717,7 +1750,7 @@ export default function HomePage() {
                       }}
                     >
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontWeight: 800, color: "#111", lineHeight: 1.2 }}>
+                        <div style={{ fontWeight: 900, color: "#111", lineHeight: 1.15, fontSize: 16 }}>
                           {filteredSpots[0].title}
                         </div>
                         <TagPills tags={filteredSpots[0].tags} max={2} />
@@ -1731,10 +1764,18 @@ export default function HomePage() {
                       </div>
                     </div>
 
-                    <div style={{ fontSize: 13, opacity: 0.8 }}>
-                      {filteredSpots[0].description.length > 70
-                        ? filteredSpots[0].description.slice(0, 70) + "…"
-                        : filteredSpots[0].description}
+                    <div
+                      style={{
+                        fontSize: 13,
+                        opacity: 0.8,
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                        lineHeight: 1.35,
+                      }}
+                    >
+                      {filteredSpots[0].description}
                     </div>
                   </div>
                 )}
@@ -1769,15 +1810,22 @@ export default function HomePage() {
                           }}
                           style={{
                             textAlign: "left",
-                            padding: 10,
-                            borderRadius: 12,
+                            padding: 12,
+                            borderRadius: 14,
                             border:
                               selected?.id === s.id
                                 ? "2px solid black"
-                                : "1px solid rgba(0,0,0,0.12)",
+                                : "1px solid rgba(0,0,0,0.10)",
                             background:
-                              selected?.id === s.id ? "rgba(0,0,0,0.04)" : "white",
+                              selected?.id === s.id ? "rgba(0,0,0,0.05)" : "white",
                             cursor: "pointer",
+                            boxShadow:
+                              selected?.id === s.id
+                                ? "0 8px 24px rgba(0,0,0,0.10)"
+                                : "0 2px 10px rgba(0,0,0,0.04)",
+                            transition:
+                              "transform 140ms ease, box-shadow 180ms ease, background 180ms ease, border-color 180ms ease",
+                            WebkitTapHighlightColor: "transparent",
                           }}
                         >
                           <div
@@ -1790,7 +1838,7 @@ export default function HomePage() {
                           >
                             <div style={{ minWidth: 0, flex: 1 }}>
                               <div style={{ display: "flex", gap: 8, alignItems: "center", minWidth: 0 }}>
-                                <strong style={{ lineHeight: 1.2 }}>{s.title}</strong>
+                                <strong style={{ lineHeight: 1.15, fontSize: 16, color: "#111" }}>{s.title}</strong>
                                 <VisibilityBadge visibility={s.visibility} />
                               </div>
                               <TagPills tags={s.tags} max={3} />
@@ -1823,24 +1871,44 @@ export default function HomePage() {
                             </div>
                           </div>
 
-                          <div style={{ opacity: 0.7, fontSize: 13, marginTop: 6 }}>
+                          <div style={{ opacity: 0.68, fontSize: 12, marginTop: 6, lineHeight: 1.3 }}>
                             {s.what3words ? `///${s.what3words}` : ""}
                           </div>
 
-                          <div style={{ marginTop: 6, opacity: 0.85 }}>
-                            {s.description.length > 90
-                              ? s.description.slice(0, 90) + "…"
-                              : s.description}
+                          <div
+                            style={{
+                              marginTop: 6,
+                              opacity: 0.85,
+                              lineHeight: 1.4,
+                              display: "-webkit-box",
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: "vertical",
+                              overflow: "hidden",
+                            }}
+                          >
+                            {s.description}
                           </div>
 
-                          <div style={{ marginTop: 8, opacity: 0.9, color: "#00dbc1" }}>
+                          <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                             <a
                               href={`https://www.google.com/maps/dir/?api=1&destination=${s.lat_out},${s.lng_out}`}
                               target="_blank"
                               rel="noreferrer"
                               onClick={(e) => e.stopPropagation()}
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 6,
+                                padding: "7px 10px",
+                                borderRadius: 999,
+                                border: "1px solid rgba(0,0,0,0.14)",
+                                textDecoration: "none",
+                                color: "#111",
+                                fontWeight: 700,
+                                background: "rgba(0,255,251,0.10)",
+                              }}
                             >
-                              Navigate
+                              📍 Navigate
                             </a>
                           </div>
                         </div>
@@ -1930,6 +1998,7 @@ export default function HomePage() {
                   left: 0,
                   right: 0,
                   bottom: 0,
+                  backdropFilter: "blur(10px)",
                   borderTopLeftRadius: 18,
                   borderTopRightRadius: 18,
                   padding: 16,
@@ -1937,7 +2006,8 @@ export default function HomePage() {
                   overflowY: "auto",
                   boxShadow: "0 -10px 40px rgba(0,0,0,0.25)",
                   transform: undefined,
-                  transition: spotSheetDragY ? "none" : "height 240ms cubic-bezier(0.22, 1, 0.36, 1)",
+                  transition: spotSheetDragY ? "none" : "height 320ms cubic-bezier(0.16, 1, 0.3, 1)",
+                  willChange: "height",
                 }}
               >
                 <button
@@ -1966,13 +2036,28 @@ export default function HomePage() {
                   />
                 </button>
 
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "start" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 8,
+                    alignItems: "start",
+                  }}
+                >
                   <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center", minWidth: 0 }}>
-                      <h3 style={{ margin: 0 }}>{selected.title}</h3>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", minWidth: 0, flexWrap: "wrap" }}>
+                      <h3
+                        style={{
+                          margin: 0,
+                          fontSize: selectedSheetIsPeek ? 18 : 22,
+                          lineHeight: 1.15,
+                        }}
+                      >
+                        {selected.title}
+                      </h3>
                       <VisibilityBadge visibility={selected.visibility} />
                     </div>
-                    <TagPills tags={selected.tags} max={6} />
+                    <TagPills tags={selected.tags} max={selectedSheetIsPeek ? 3 : 6} />
                   </div>
 
                   <button
@@ -1989,32 +2074,12 @@ export default function HomePage() {
                   </button>
                 </div>
 
-                {selected.photo_url && (
-                  <img
-                    src={selected.photo_url}
-                    alt={selected.title}
-                    style={{
-                      width: "100%",
-                      borderRadius: 12,
-                      marginTop: 10,
-                      maxHeight: 220,
-                      objectFit: "cover",
-                    }}
-                  />
-                )}
-
-                {selected.date_start && (
-                  <p style={{ opacity: 0.7, marginTop: 6 }}>{selected.date_start}</p>
-                )}
-
-                <p style={{ marginTop: 10 }}>{selected.description}</p>
-
-                <p style={{ opacity: 0.75, margin: "8px 0" }}>
+                <div style={{ opacity: 0.75, marginTop: 8, fontSize: 14 }}>
                   {selected.what3words ? `///${selected.what3words}` : null}
-                  {selected.distance_m ? ` • ${formatDistance(selected.distance_m)} away` : null}
-                </p>
+                  {selected.distance_m ? `${selected.what3words ? " • " : ""}${formatDistance(selected.distance_m)} away` : null}
+                </div>
 
-                <div style={{ display: "flex", gap: 12, marginTop: 10, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
                   <a
                     href={`https://www.google.com/maps/dir/?api=1&destination=${selected.lat_out},${selected.lng_out}`}
                     target="_blank"
@@ -2031,7 +2096,7 @@ export default function HomePage() {
                     Navigate
                   </a>
 
-                  {selected.source_url && (
+                  {!selectedSheetIsPeek && selected.source_url && (
                     <a
                       href={selected.source_url}
                       target="_blank"
@@ -2049,6 +2114,42 @@ export default function HomePage() {
                     </a>
                   )}
                 </div>
+
+                {!selectedSheetIsPeek && selected.photo_url && (
+                  <img
+                    src={selected.photo_url}
+                    alt={selected.title}
+                    style={{
+                      width: "100%",
+                      borderRadius: 12,
+                      marginTop: 12,
+                      maxHeight: selectedSheetIsHalf ? 180 : 240,
+                      objectFit: "cover",
+                    }}
+                  />
+                )}
+
+                {!selectedSheetIsPeek && selected.date_start && (
+                  <p style={{ opacity: 0.7, marginTop: 8 }}>{selected.date_start}</p>
+                )}
+
+                {!selectedSheetIsPeek && (
+                  <p style={{ marginTop: 10 }}>
+                    {selectedSheetIsHalf && selected.description.length > 180
+                      ? selected.description.slice(0, 180) + "…"
+                      : selected.description}
+                  </p>
+                )}
+
+                {selectedSheetIsFull && (
+                  <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
+                    {selected.source_url && (
+                      <div style={{ fontSize: 14, color: "#444" }}>
+                        Source available for this spot.
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
