@@ -180,6 +180,7 @@ export default function HomePage() {
   const [pos, setPos] = useState<{ lat: number; lng: number } | null>(null);
   const [spots, setSpots] = useState<Spot[]>([]);
   const [selected, setSelected] = useState<Spot | null>(null);
+  const [pulsingMarkerId, setPulsingMarkerId] = useState<string | null>(null);
   const [radiusM, setRadiusM] = useState(2500);
   const [userId, setUserId] = useState<string | null>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
@@ -188,6 +189,7 @@ export default function HomePage() {
     lng: number;
   } | null>(null);
   const [crosshairPulseKey, setCrosshairPulseKey] = useState(0);
+  const markerPulseTimeoutRef = useRef<number | null>(null);
 
   const [showFilters, setShowFilters] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -443,6 +445,14 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
+    return () => {
+      if (markerPulseTimeoutRef.current != null) {
+        window.clearTimeout(markerPulseTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (!pos) return;
     (async () => {
       const { data, error } = await supabase.rpc("spots_nearby", {
@@ -548,28 +558,49 @@ export default function HomePage() {
     setSelected(s);
     if (isMobile) setMobileListOpen(false);
 
-    // Center the map on the selected spot
+    setPulsingMarkerId(s.id);
+    if (markerPulseTimeoutRef.current != null) {
+      window.clearTimeout(markerPulseTimeoutRef.current);
+    }
+    markerPulseTimeoutRef.current = window.setTimeout(() => {
+      setPulsingMarkerId((prev) => (prev === s.id ? null : prev));
+      markerPulseTimeoutRef.current = null;
+    }, 220);
+
     if (map) {
       map.panTo({ lat: s.lat_out, lng: s.lng_out });
 
-      // Optional: if the user is zoomed way out, zoom in a bit for detail
       const z = map.getZoom();
       if (typeof z === "number" && z < 13) map.setZoom(13);
+
+      if (isMobile) {
+        window.setTimeout(() => {
+          map.panBy(0, 120);
+        }, 140);
+      }
     }
   }
 
-  function markerIconForVisibility(v?: string | null, isSelected = false): google.maps.Icon {
+  function markerIconForVisibility(
+    v?: string | null,
+    isSelected = false,
+    isPulsing = false
+  ): google.maps.Icon {
     const color =
       v === "friends" ? "#2563eb" :
       v === "group" ? "#7c3aed" :
       v === "private" ? "#6b7280" :
       "#00dbc1"; // public
 
-    const size = isSelected ? 36 : 28;
+    const size = isPulsing ? 44 : isSelected ? 36 : 28;
     const anchorX = size / 2;
     const anchorY = size;
-    const innerR = isSelected ? 3.2 : 2.6;
-    const stroke = isSelected ? "rgba(0,0,0,0.55)" : "rgba(0,0,0,0.35)";
+    const innerR = isPulsing ? 3.8 : isSelected ? 3.2 : 2.6;
+    const stroke = isPulsing
+      ? "rgba(0,0,0,0.70)"
+      : isSelected
+        ? "rgba(0,0,0,0.55)"
+        : "rgba(0,0,0,0.35)";
 
     const svg = `<?xml version="1.0" encoding="UTF-8"?>
   <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24">
@@ -1659,7 +1690,11 @@ export default function HomePage() {
                   key={s.id}
                   position={{ lat: s.lat_out, lng: s.lng_out }}
                   title={s.title}
-                  icon={markerIconForVisibility((s as any).visibility, selected?.id === s.id)}
+                  icon={markerIconForVisibility(
+                    (s as any).visibility,
+                    selected?.id === s.id,
+                    pulsingMarkerId === s.id
+                  )}
                   zIndex={selected?.id === s.id ? 1000 : undefined}
                   onClick={() => {
                     selectSpot(s);
