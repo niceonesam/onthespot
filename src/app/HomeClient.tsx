@@ -75,20 +75,6 @@ function pinSvg(fill: string) {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
 
-const ICONS = {
-  public: pinSvg("#111111"),
-  friends: pinSvg("#0b57d0"),
-  group: pinSvg("#a855f7"),
-  private: pinSvg("#6b7280"),
-} as const;
-
-function iconForVisibility(v: string | null | undefined) {
-  if (v === "friends") return ICONS.friends;
-  if (v === "group") return ICONS.group;
-  if (v === "private") return ICONS.private;
-  return ICONS.public;
-}
-
 function VisibilityBadge(props: { visibility: Spot["visibility"] }) {
   const v = props.visibility;
   if (v === "public") return null;
@@ -193,7 +179,7 @@ export default function HomePage() {
 
   const [showFilters, setShowFilters] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [mobileListOpen, setMobileListOpen] = useState(false);
+  const [mobileListSnap, setMobileListSnap] = useState<"peek" | "half" | "full">("peek");
   const filterTouchStartYRef = useRef<number | null>(null);
   const filterTouchCurrentYRef = useRef<number | null>(null);
   const [filterSheetDragY, setFilterSheetDragY] = useState(0);
@@ -205,6 +191,7 @@ export default function HomePage() {
   const [searchText, setSearchText] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [visibilityFilter, setVisibilityFilter] = useState<string>("all");
+  const [tagFilter, setTagFilter] = useState<string>("all");
   // Optional: only works if your RPC returns is_imported (won't break if it doesn't)
   const [importedOnly, setImportedOnly] = useState(false);
   // Admin button for Admin users
@@ -296,8 +283,18 @@ export default function HomePage() {
     const catOk = categoryFilter === "all" || s.category === categoryFilter;
     const vis = (s as any).visibility ?? "public";
     const visOk = visibilityFilter === "all" || vis === visibilityFilter;
-    return catOk && visOk;
+    const tags = (s.tags ?? []).map((t) => String(t).trim().toLowerCase());
+    const tagOk = tagFilter === "all" || tags.includes(tagFilter.toLowerCase());
+    return catOk && visOk && tagOk;
   });
+
+  const availableTags = Array.from(
+    new Set(
+      spots.flatMap((s) => (s.tags ?? []).map((t) => String(t).trim()).filter(Boolean))
+    )
+  )
+    .sort((a, b) => a.localeCompare(b))
+    .slice(0, 16);
 
   const selectedCategoryLabel =
     categoryFilter === "all"
@@ -310,6 +307,7 @@ export default function HomePage() {
     visibilityFilter !== "all"
       ? visibilityFilter.charAt(0).toUpperCase() + visibilityFilter.slice(1)
       : null,
+    tagFilter !== "all" ? `#${tagFilter}` : null,
     importedOnly ? "Imported" : null,
     searchText.trim() ? `“${searchText.trim()}”` : null,
   ].filter(Boolean) as string[];
@@ -317,6 +315,14 @@ export default function HomePage() {
   const filterSummary = activeFilterParts.length
     ? activeFilterParts.join(" • ")
     : null;
+
+  const mobileListExpanded = mobileListSnap !== "peek";
+
+  function cycleMobileListSnap() {
+    setMobileListSnap((prev) =>
+      prev === "peek" ? "half" : prev === "half" ? "full" : "peek"
+    );
+  }
 
   const mobileQuickChips = [
     {
@@ -429,7 +435,7 @@ export default function HomePage() {
     const apply = () => {
       const mobile = mq.matches;
       setIsMobile(mobile);
-      if (!mobile) setMobileListOpen(false);
+      setMobileListSnap(mobile ? "peek" : "full");
     };
 
     apply();
@@ -499,6 +505,7 @@ export default function HomePage() {
       if (typeof v.searchText === "string") setSearchText(v.searchText);
       if (typeof v.categoryFilter === "string") setCategoryFilter(v.categoryFilter);
       if (typeof v.visibilityFilter === "string") setVisibilityFilter(v.visibilityFilter);
+      if (typeof v.tagFilter === "string") setTagFilter(v.tagFilter);
       if (typeof v.importedOnly === "boolean") setImportedOnly(v.importedOnly);
     } catch {
       // ignore bad saved state
@@ -511,12 +518,12 @@ export default function HomePage() {
     try {
       localStorage.setItem(
         "ots_filters_v1",
-        JSON.stringify({ radiusM, searchText, categoryFilter, visibilityFilter, importedOnly })
+        JSON.stringify({ radiusM, searchText, categoryFilter, visibilityFilter, tagFilter, importedOnly })
       );
     } catch {
       // ignore storage errors
     }
-  }, [radiusM, searchText, categoryFilter, visibilityFilter, importedOnly]);
+  }, [radiusM, searchText, categoryFilter, visibilityFilter, tagFilter, importedOnly]);
 
   // (Filtering is now done in SQL; filteredSpots removed)
 
@@ -556,7 +563,7 @@ export default function HomePage() {
 
   function selectSpot(s: Spot) {
     setSelected(s);
-    if (isMobile) setMobileListOpen(false);
+    if (isMobile) setMobileListSnap("peek");
 
     setPulsingMarkerId(s.id);
     if (markerPulseTimeoutRef.current != null) {
@@ -1187,6 +1194,43 @@ export default function HomePage() {
                   </select>
                 </label>
 
+                {availableTags.length > 0 && (
+                  <div style={{ display: "grid", gap: 6 }}>
+                    <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Tag</span>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <button
+                        type="button"
+                        className="ots-btn"
+                        onClick={() => setTagFilter("all")}
+                        style={{
+                          padding: "6px 10px",
+                          borderRadius: 999,
+                          fontWeight: tagFilter === "all" ? 800 : 700,
+                          background: tagFilter === "all" ? "rgba(0,255,251,0.16)" : "white",
+                        }}
+                      >
+                        All tags
+                      </button>
+                      {availableTags.map((tag) => (
+                        <button
+                          key={tag}
+                          type="button"
+                          className="ots-btn"
+                          onClick={() => setTagFilter(tag)}
+                          style={{
+                            padding: "6px 10px",
+                            borderRadius: 999,
+                            fontWeight: tagFilter === tag ? 800 : 700,
+                            background: tagFilter === tag ? "rgba(0,255,251,0.16)" : "white",
+                          }}
+                        >
+                          #{tag}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <label style={{ display: "grid", gap: 6 }}>
                   <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Radius</span>
                   <select
@@ -1345,6 +1389,7 @@ export default function HomePage() {
                     setSearchText("");
                     setCategoryFilter("all");
                     setVisibilityFilter("all");
+                    setTagFilter("all");
                     setImportedOnly(false);
                     setRadiusM(2500);
                   }}
@@ -1372,39 +1417,100 @@ export default function HomePage() {
         {isMobile && (
           <div
             style={{
-              display: "flex",
+              display: "grid",
               gap: 8,
-              overflowX: "auto",
               padding: "8px 12px 6px",
               background: "rgba(255,255,255,0.92)",
               backdropFilter: "blur(8px)",
               borderBottom: "1px solid rgba(0,0,0,0.06)",
-              WebkitOverflowScrolling: "touch",
             }}
           >
-            {mobileQuickChips.map((chip) => (
-              <button
-                key={chip.key}
-                type="button"
-                onClick={chip.onClick}
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                overflowX: "auto",
+                WebkitOverflowScrolling: "touch",
+              }}
+            >
+              {mobileQuickChips.map((chip) => (
+                <button
+                  key={chip.key}
+                  type="button"
+                  onClick={chip.onClick}
+                  style={{
+                    flex: "0 0 auto",
+                    padding: "8px 12px",
+                    borderRadius: 999,
+                    border: chip.active
+                      ? "1px solid rgba(0,0,0,0.22)"
+                      : "1px solid rgba(0,0,0,0.12)",
+                    background: chip.active ? "rgba(0,255,251,0.16)" : "white",
+                    color: "#111",
+                    fontWeight: chip.active ? 800 : 700,
+                    cursor: "pointer",
+                    boxShadow: chip.active ? "0 4px 12px rgba(0,0,0,0.08)" : "none",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+
+            {availableTags.length > 0 && (
+              <div
                 style={{
-                  flex: "0 0 auto",
-                  padding: "8px 12px",
-                  borderRadius: 999,
-                  border: chip.active
-                    ? "1px solid rgba(0,0,0,0.22)"
-                    : "1px solid rgba(0,0,0,0.12)",
-                  background: chip.active ? "rgba(0,255,251,0.16)" : "white",
-                  color: "#111",
-                  fontWeight: chip.active ? 800 : 700,
-                  cursor: "pointer",
-                  boxShadow: chip.active ? "0 4px 12px rgba(0,0,0,0.08)" : "none",
-                  whiteSpace: "nowrap",
+                  display: "flex",
+                  gap: 8,
+                  overflowX: "auto",
+                  WebkitOverflowScrolling: "touch",
                 }}
               >
-                {chip.label}
-              </button>
-            ))}
+                <button
+                  type="button"
+                  onClick={() => setTagFilter("all")}
+                  style={{
+                    flex: "0 0 auto",
+                    padding: "6px 10px",
+                    borderRadius: 999,
+                    border: tagFilter === "all"
+                      ? "1px solid rgba(0,0,0,0.22)"
+                      : "1px solid rgba(0,0,0,0.12)",
+                    background: tagFilter === "all" ? "rgba(0,255,251,0.16)" : "white",
+                    color: "#111",
+                    fontWeight: tagFilter === "all" ? 800 : 700,
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  All tags
+                </button>
+
+                {availableTags.map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => setTagFilter(tag)}
+                    style={{
+                      flex: "0 0 auto",
+                      padding: "6px 10px",
+                      borderRadius: 999,
+                      border: tagFilter === tag
+                        ? "1px solid rgba(0,0,0,0.22)"
+                        : "1px solid rgba(0,0,0,0.12)",
+                      background: tagFilter === tag ? "rgba(0,255,251,0.16)" : "white",
+                      color: "#111",
+                      fontWeight: tagFilter === tag ? 800 : 700,
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    #{tag}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -1430,7 +1536,12 @@ export default function HomePage() {
                       right: 8,
                       bottom: 8,
                       zIndex: 20,
-                      height: mobileListOpen ? "min(46vh, 420px)" : 92,
+                      height:
+                        mobileListSnap === "peek"
+                          ? 92
+                          : mobileListSnap === "half"
+                            ? "min(38vh, 320px)"
+                            : "min(72vh, 640px)",
                       borderRadius: 16,
                       boxShadow: "0 16px 40px rgba(0,0,0,0.22)",
                       overflow: "hidden",
@@ -1444,7 +1555,7 @@ export default function HomePage() {
                 style={{
                   display: "grid",
                   gap: 8,
-                  marginBottom: isMobile && !mobileListOpen ? 0 : 10,
+                  marginBottom: isMobile && mobileListSnap === "peek" ? 0 : 10,
                   position: isMobile ? "sticky" : undefined,
                   top: isMobile ? 0 : undefined,
                   background: isMobile ? "white" : undefined,
@@ -1452,7 +1563,7 @@ export default function HomePage() {
                   zIndex: isMobile ? 1 : undefined,
                   cursor: isMobile ? "pointer" : undefined,
                 }}
-                onClick={isMobile ? () => setMobileListOpen((v) => !v) : undefined}
+                onClick={isMobile ? cycleMobileListSnap : undefined}
               >
                 {isMobile && (
                   <div
@@ -1478,7 +1589,7 @@ export default function HomePage() {
                     <h3 style={{ margin: 0 }}>Nearby Spots</h3>
                     {isMobile && (
                       <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
-                        {filteredSpots.length} found nearby {mobileListOpen ? "" : "• tap to expand"}
+                        {filteredSpots.length} found nearby {mobileListSnap === "peek" ? "• tap to expand" : mobileListSnap === "half" ? "• tap for full list" : ""}
                       </div>
                     )}
                   </div>
@@ -1489,16 +1600,18 @@ export default function HomePage() {
                       className="ots-btn"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setMobileListOpen((v) => !v);
+                        setMobileListSnap((prev) =>
+                          prev === "peek" ? "half" : prev === "half" ? "full" : "peek"
+                        );
                       }}
                       style={{ padding: "8px 10px", borderRadius: 999 }}
                     >
-                      {mobileListOpen ? "Hide" : "Show"}
+                      {mobileListSnap === "peek" ? "Show" : mobileListSnap === "half" ? "Full" : "Hide"}
                     </button>
                   )}
                 </div>
 
-                {isMobile && !mobileListOpen && filteredSpots.length > 0 && (
+                {isMobile && mobileListSnap === "peek" && filteredSpots.length > 0 && (
                   <div
                     className="ots-surface ots-surface--border"
                     style={{
@@ -1540,8 +1653,17 @@ export default function HomePage() {
                 )}
               </div>
 
-              {(!isMobile || mobileListOpen) && (
-                <div style={{ overflowY: "auto", maxHeight: isMobile ? "calc(46vh - 56px)" : undefined }}>
+              {(!isMobile || mobileListExpanded) && (
+                <div
+                  style={{
+                    overflowY: "auto",
+                    maxHeight: isMobile
+                      ? mobileListSnap === "half"
+                        ? "calc(38vh - 56px)"
+                        : "calc(72vh - 56px)"
+                      : undefined,
+                  }}
+                >
                   {filteredSpots.length === 0 ? (
                     <p style={{ opacity: 0.7 }}>No Spots found with these filters.</p>
                   ) : (
@@ -1832,7 +1954,15 @@ export default function HomePage() {
               style={{
                 position: "absolute",
                 right: 16,
-                bottom: selected ? "70vh" : 16,
+                bottom: selected
+                  ? "70vh"
+                  : isMobile
+                    ? mobileListSnap === "peek"
+                      ? 108
+                      : mobileListSnap === "half"
+                        ? "42vh"
+                        : "66vh"
+                    : 16,
                 width: 56,
                 height: 56,
                 borderRadius: "50%",
