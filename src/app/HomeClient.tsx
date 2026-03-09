@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { GoogleMap, MarkerF, useLoadScript } from "@react-google-maps/api";
+import { GoogleMap, MarkerF, MarkerClustererF, useLoadScript } from "@react-google-maps/api";
 import { getSupabaseBrowser } from "@/lib/supabase/browser";
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
@@ -169,6 +169,24 @@ function clamp<T extends number>(value: T, min: number, max: number) {
   return Math.max(min, Math.min(max, value)) as T;
 }
 
+function clusterBubbleDataUrl(fill: string, stroke: string) {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+      <defs>
+        <radialGradient id="clusterGlow" cx="35%" cy="30%" r="75%">
+          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95" />
+          <stop offset="18%" stop-color="#7ff7eb" />
+          <stop offset="68%" stop-color="${fill}" />
+          <stop offset="100%" stop-color="${stroke}" />
+        </radialGradient>
+      </defs>
+      <circle cx="32" cy="32" r="26" fill="url(#clusterGlow)" stroke="rgba(0,0,0,0.22)" stroke-width="2" />
+      <circle cx="32" cy="32" r="18" fill="rgba(255,255,255,0.16)" />
+    </svg>
+  `;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
+
 export default function HomePage() {
   const supabase = getSupabaseBrowser();
 
@@ -300,9 +318,7 @@ export default function HomePage() {
     const catOk = categoryFilter === "all" || s.category === categoryFilter;
     const vis = (s as any).visibility ?? "public";
     const visOk = visibilityFilter === "all" || vis === visibilityFilter;
-    const tags = (s.tags ?? []).map((t) => String(t).trim().toLowerCase());
-    const tagOk = tagFilter === "all" || tags.includes(tagFilter.toLowerCase());
-    return catOk && visOk && tagOk;
+    return catOk && visOk;
   });
 
   const availableTags = Array.from(
@@ -335,6 +351,37 @@ export default function HomePage() {
 
   const mobileListExpanded = mobileListSnap !== "peek";
   const mobileSnapOrder: Array<"peek" | "half" | "full"> = ["peek", "half", "full"];
+  const shouldClusterMarkers = filteredSpots.length >= (isMobile ? 12 : 20);
+  const clusterAnchorText: [number, number] = [0, 0];
+  const clusterStyles = [
+    {
+      url: clusterBubbleDataUrl("#00dbc1", "#00bfa9"),
+      height: 52,
+      width: 52,
+      textColor: "#111111",
+      textSize: 17,
+      fontWeight: "800",
+      anchorText: clusterAnchorText,
+    },
+    {
+      url: clusterBubbleDataUrl("#00dbc1", "#00bfa9"),
+      height: 58,
+      width: 58,
+      textColor: "#111111",
+      textSize: 17,
+      fontWeight: "800",
+      anchorText: clusterAnchorText,
+    },
+    {
+      url: clusterBubbleDataUrl("#00dbc1", "#00bfa9"),
+      height: 64,
+      width: 64,
+      textColor: "#111111",
+      textSize: 16,
+      fontWeight: "800",
+      anchorText: clusterAnchorText,
+    },
+  ];
 
   function cycleMobileListSnap() {
     setMobileListSnap((prev) =>
@@ -544,12 +591,13 @@ export default function HomePage() {
         radius_m: radiusM,
         category: categoryFilter === "all" ? null : categoryFilter,
         visibility: visibilityFilter === "all" ? null : visibilityFilter,
+        tag_filter: tagFilter === "all" ? null : tagFilter,
         q: searchText.trim() ? searchText.trim() : null,
         imported_only: importedOnly,
       });
       if (!error && data) setSpots(data as Spot[]);
     })();
-  }, [pos, radiusM, categoryFilter, searchText, importedOnly, supabase, visibilityFilter]);
+  }, [pos, radiusM, categoryFilter, searchText, importedOnly, supabase, visibilityFilter, tagFilter]);
 
   // Close on Escape
   useEffect(() => {
@@ -1962,22 +2010,56 @@ export default function HomePage() {
             >
               <MarkerF position={pos} title="You" />
 
-              {filteredSpots.map((s) => (
-                <MarkerF
-                  key={s.id}
-                  position={{ lat: s.lat_out, lng: s.lng_out }}
-                  title={s.title}
-                  icon={markerIconForVisibility(
-                    (s as any).visibility,
-                    selected?.id === s.id,
-                    pulsingMarkerId === s.id
-                  )}
-                  zIndex={selected?.id === s.id ? 1000 : undefined}
-                  onClick={() => {
-                    selectSpot(s);
+              {shouldClusterMarkers ? (
+                <MarkerClustererF
+                  options={{
+                    minimumClusterSize: 2,
+                    gridSize: isMobile ? 44 : 56,
+                    maxZoom: 16,
+                    styles: clusterStyles,
+                    clusterClass: "ots-map-cluster",
                   }}
-                />
-              ))}
+                >
+                  {(clusterer) => (
+                    <>
+                      {filteredSpots.map((s) => (
+                        <MarkerF
+                          key={s.id}
+                          clusterer={selected?.id === s.id ? undefined : clusterer}
+                          position={{ lat: s.lat_out, lng: s.lng_out }}
+                          title={s.title}
+                          icon={markerIconForVisibility(
+                            (s as any).visibility,
+                            selected?.id === s.id,
+                            pulsingMarkerId === s.id
+                          )}
+                          zIndex={selected?.id === s.id ? 1000 : undefined}
+                          onClick={() => {
+                            selectSpot(s);
+                          }}
+                        />
+                      ))}
+                    </>
+                  )}
+                </MarkerClustererF>
+              ) : (
+                filteredSpots.map((s) => (
+                  <MarkerF
+                    key={s.id}
+                    position={{ lat: s.lat_out, lng: s.lng_out }}
+                    title={s.title}
+                    icon={markerIconForVisibility(
+                      (s as any).visibility,
+                      selected?.id === s.id,
+                      pulsingMarkerId === s.id
+                    )}
+                    zIndex={selected?.id === s.id ? 1000 : undefined}
+                    onClick={() => {
+                      selectSpot(s);
+                    }}
+                  />
+                ))
+              )}
             </GoogleMap>
 
             {!selected && (
