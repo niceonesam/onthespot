@@ -65,16 +65,6 @@ function formatDistance(meters: number) {
   return `${(meters / 1000).toFixed(1)} km`;
 }
 
-function pinSvg(fill: string) {
-  const svg = `
-  <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24">
-    <path d="M12 22s7-4.35 7-11a7 7 0 1 0-14 0c0 6.65 7 11 7 11z"
-      fill="${fill}" stroke="rgba(0,0,0,0.35)" stroke-width="1.2"/>
-    <circle cx="12" cy="11" r="2.5" fill="white"/>
-  </svg>`;
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
-}
-
 function VisibilityBadge(props: { visibility: Spot["visibility"] }) {
   const v = props.visibility;
   if (v === "public") return null;
@@ -178,6 +168,7 @@ export default function HomePage() {
   const [pos, setPos] = useState<{ lat: number; lng: number } | null>(null);
   const [spots, setSpots] = useState<Spot[]>([]);
   const [selected, setSelected] = useState<Spot | null>(null);
+  const [selectedSheetSnap, setSelectedSheetSnap] = useState<"peek" | "half" | "full">("half");
   const [pulsingMarkerId, setPulsingMarkerId] = useState<string | null>(null);
   const [radiusM, setRadiusM] = useState(2500);
   const [userId, setUserId] = useState<string | null>(null);
@@ -192,6 +183,9 @@ export default function HomePage() {
   const [showFilters, setShowFilters] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileListSnap, setMobileListSnap] = useState<"peek" | "half" | "full">("peek");
+  const mobileListTouchStartYRef = useRef<number | null>(null);
+  const mobileListTouchCurrentYRef = useRef<number | null>(null);
+  const [mobileListDragY, setMobileListDragY] = useState(0);
   const filterTouchStartYRef = useRef<number | null>(null);
   const filterTouchCurrentYRef = useRef<number | null>(null);
   const [filterSheetDragY, setFilterSheetDragY] = useState(0);
@@ -208,7 +202,6 @@ export default function HomePage() {
   const [importedOnly, setImportedOnly] = useState(false);
   // Admin button for Admin users
   const [isAdmin, setIsAdmin] = useState(false);
-  const [adminDebug, setAdminDebug] = useState<string>("(not run yet)");  // TEMP
   // Categories state
   const [categories, setCategories] = useState<SpotCategory[]>([]);
   const [categoriesLoaded, setCategoriesLoaded] = useState(false);
@@ -334,6 +327,65 @@ export default function HomePage() {
     setMobileListSnap((prev) =>
       prev === "peek" ? "half" : prev === "half" ? "full" : "peek"
     );
+    vibrateLight();
+  }
+
+  function mobileListHeightForSnap() {
+    return mobileListSnap === "peek"
+      ? 92
+      : mobileListSnap === "half"
+        ? 320
+        : 640;
+  }
+
+  function resetMobileListDrag() {
+    mobileListTouchStartYRef.current = null;
+    mobileListTouchCurrentYRef.current = null;
+    setMobileListDragY(0);
+  }
+
+  function onMobileListTouchStart(e: React.TouchEvent<HTMLDivElement>) {
+    if (!isMobile) return;
+    const y = e.touches[0]?.clientY;
+    if (typeof y !== "number") return;
+    mobileListTouchStartYRef.current = y;
+    mobileListTouchCurrentYRef.current = y;
+  }
+
+  function onMobileListTouchMove(e: React.TouchEvent<HTMLDivElement>) {
+    if (!isMobile) return;
+    if (mobileListTouchStartYRef.current == null) return;
+
+    const y = e.touches[0]?.clientY;
+    if (typeof y !== "number") return;
+    mobileListTouchCurrentYRef.current = y;
+
+    const delta = y - mobileListTouchStartYRef.current;
+    setMobileListDragY(delta);
+  }
+
+  function onMobileListTouchEnd() {
+    if (!isMobile) {
+      resetMobileListDrag();
+      return;
+    }
+
+    const startY = mobileListTouchStartYRef.current;
+    const endY = mobileListTouchCurrentYRef.current;
+    const delta =
+      typeof startY === "number" && typeof endY === "number"
+        ? endY - startY
+        : 0;
+
+    if (delta < -60) {
+      setMobileListSnap((prev) => (prev === "peek" ? "half" : "full"));
+      vibrateLight();
+    } else if (delta > 60) {
+      setMobileListSnap((prev) => (prev === "full" ? "half" : "peek"));
+      vibrateLight();
+    }
+
+    resetMobileListDrag();
   }
 
   const mobileQuickChips = [
@@ -380,8 +432,6 @@ export default function HomePage() {
 
     async function refreshAuthFlags() {
       try {
-        setAdminDebug("checking…");
-
         const { data: sessionData } = await supabase.auth.getSession();
         const accessToken = sessionData.session?.access_token;
         console.log("sessionData.session:", sessionData.session);  //TEMP
@@ -395,7 +445,6 @@ export default function HomePage() {
           setSessionEmail(null);
           setUserId(null);
           setIsAdmin(false);
-          setAdminDebug(`api/me ${res.status}`);
           return;
         }
 
@@ -408,12 +457,10 @@ export default function HomePage() {
         setSessionEmail(j.email);
         setUserId(j.user_id);
         setIsAdmin(Boolean(j.is_admin));
-        setAdminDebug(`api/me admin=${String(j.is_admin)}`);
       } catch (e: any) {
         setSessionEmail(null);
         setUserId(null);
         setIsAdmin(false);
-        setAdminDebug(`api/me error: ${e?.message ?? String(e)}`);
       }
     }
 
@@ -575,6 +622,7 @@ export default function HomePage() {
 
   function selectSpot(s: Spot) {
     setSelected(s);
+    setSelectedSheetSnap("half");
     vibrateLight();
     if (isMobile) setMobileListSnap("peek");
 
@@ -716,6 +764,21 @@ export default function HomePage() {
     resetFilterSheetDrag();
   }
 
+  function selectedSheetHeightForSnap() {
+    return selectedSheetSnap === "peek"
+      ? 148
+      : selectedSheetSnap === "half"
+        ? 360
+        : 620;
+  }
+
+  function cycleSelectedSheetSnap() {
+    setSelectedSheetSnap((prev) =>
+      prev === "peek" ? "half" : prev === "half" ? "full" : "peek"
+    );
+    vibrateLight();
+  }
+
   // Spot sheet drag helpers
   function onSpotSheetTouchStart(e: React.TouchEvent<HTMLDivElement>) {
     const y = e.touches[0]?.clientY;
@@ -752,10 +815,20 @@ export default function HomePage() {
         ? endY - startY
         : 0;
 
-    // If user dragged far enough, close the sheet
-    if (delta > 120) {
-      setSelected(null);
+    if (delta < -60) {
+      setSelectedSheetSnap((prev) => (prev === "peek" ? "half" : "full"));
       vibrateLight();
+    } else if (delta > 60) {
+      if (selectedSheetSnap === "full") {
+        setSelectedSheetSnap("half");
+        vibrateLight();
+      } else if (selectedSheetSnap === "half") {
+        setSelectedSheetSnap("peek");
+        vibrateLight();
+      } else {
+        setSelected(null);
+        vibrateLight();
+      }
     }
 
     resetSpotSheetDrag();
@@ -1544,6 +1617,9 @@ export default function HomePage() {
           {/* Nearby list: desktop sidebar, mobile bottom sheet */}
             <aside
               className="ots-list ots-surface ots-surface--border"
+              onTouchStart={onMobileListTouchStart}
+              onTouchMove={onMobileListTouchMove}
+              onTouchEnd={onMobileListTouchEnd}
               style={
                 isMobile
                   ? {
@@ -1552,17 +1628,14 @@ export default function HomePage() {
                       right: 8,
                       bottom: 8,
                       zIndex: 20,
-                      height:
-                        mobileListSnap === "peek"
-                          ? 92
-                          : mobileListSnap === "half"
-                            ? "min(38vh, 320px)"
-                            : "min(72vh, 640px)",
+                      height: isMobile
+                        ? `min(calc(100vh - 24px), ${Math.max(92, mobileListHeightForSnap() - mobileListDragY)}px)`
+                        : undefined,
                       borderRadius: 16,
                       boxShadow: "0 16px 40px rgba(0,0,0,0.22)",
                       overflow: "hidden",
                       background: "white",
-                      transition: "height 180ms ease",
+                      transition: mobileListDragY ? "none" : "height 240ms cubic-bezier(0.22, 1, 0.36, 1)",
                     }
                   : undefined
               }
@@ -1616,9 +1689,7 @@ export default function HomePage() {
                       className="ots-btn"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setMobileListSnap((prev) =>
-                          prev === "peek" ? "half" : prev === "half" ? "full" : "peek"
-                        );
+                        cycleMobileListSnap();
                       }}
                       style={{ padding: "8px 10px", borderRadius: 999 }}
                     >
@@ -1862,22 +1933,38 @@ export default function HomePage() {
                   borderTopLeftRadius: 18,
                   borderTopRightRadius: 18,
                   padding: 16,
-                  maxHeight: "60vh",
+                  height: `min(calc(100vh - 24px), ${Math.max(148, selectedSheetHeightForSnap() - spotSheetDragY)}px)`,
                   overflowY: "auto",
                   boxShadow: "0 -10px 40px rgba(0,0,0,0.25)",
-                  transform: spotSheetDragY ? `translateY(${spotSheetDragY}px)` : undefined,
-                  transition: spotSheetDragY ? "none" : "transform 180ms ease",
+                  transform: undefined,
+                  transition: spotSheetDragY ? "none" : "height 240ms cubic-bezier(0.22, 1, 0.36, 1)",
                 }}
               >
-                <div
+                <button
+                  type="button"
+                  onClick={cycleSelectedSheetSnap}
+                  aria-label="Resize details sheet"
                   style={{
-                    width: 40,
-                    height: 4,
-                    borderRadius: 999,
-                    background: "rgba(0,0,0,0.2)",
+                    display: "block",
+                    width: 44,
+                    height: 12,
+                    padding: 0,
+                    border: "none",
+                    background: "transparent",
                     margin: "0 auto 12px auto",
+                    cursor: "pointer",
                   }}
-                />
+                >
+                  <div
+                    style={{
+                      width: 40,
+                      height: 4,
+                      borderRadius: 999,
+                      background: "rgba(0,0,0,0.2)",
+                      margin: "4px auto 0 auto",
+                    }}
+                  />
+                </button>
 
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "start" }}>
                   <div style={{ minWidth: 0, flex: 1 }}>
@@ -1971,7 +2058,11 @@ export default function HomePage() {
                 position: "absolute",
                 right: 16,
                 bottom: selected
-                  ? "70vh"
+                  ? selectedSheetSnap === "peek"
+                    ? 164
+                    : selectedSheetSnap === "half"
+                      ? "44vh"
+                      : "74vh"
                   : isMobile
                     ? mobileListSnap === "peek"
                       ? 108
