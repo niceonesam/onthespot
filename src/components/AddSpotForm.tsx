@@ -61,6 +61,8 @@ const [loadingCategories, setLoadingCategories] = useState(false);
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [publishSuccess, setPublishSuccess] = useState(false);
+  const formLocked = submitting || publishSuccess;
 
   useEffect(() => {
   const latParam = searchParams.get("lat");
@@ -531,6 +533,11 @@ const [loadingCategories, setLoadingCategories] = useState(false);
           return;
         }
 
+        setPublishSuccess(true);
+        setMsg(null);
+
+        await new Promise((resolve) => window.setTimeout(resolve, 950));
+
         // Close the Add Spot screen.
         // If this page is shown as a modal (parallel route), `back()` closes it.
         // Otherwise we fall back to a normal redirect home.
@@ -551,6 +558,97 @@ const [loadingCategories, setLoadingCategories] = useState(false);
 
   if (!isLoaded || !pos) return <div style={{ padding: 16 }}>Loading…</div>;
 
+  if (publishSuccess) {
+    return (
+      <div
+        style={{
+          minHeight: "70vh",
+          display: "grid",
+          placeItems: "center",
+          padding: 16,
+        }}
+      >
+        <style jsx>{`
+          @keyframes ots-success-pop {
+            0% {
+              transform: scale(0.78);
+              opacity: 0;
+            }
+            60% {
+              transform: scale(1.08);
+              opacity: 1;
+            }
+            100% {
+              transform: scale(1);
+              opacity: 1;
+            }
+          }
+        `}</style>
+
+        <div
+          className="ots-surface ots-surface--shadow"
+          style={{
+            width: "min(520px, 100%)",
+            padding: 24,
+            textAlign: "center",
+            display: "grid",
+            gap: 14,
+          }}
+        >
+          <div
+            aria-hidden="true"
+            style={{
+              width: 82,
+              height: 82,
+              margin: "0 auto",
+              borderRadius: 999,
+              display: "grid",
+              placeItems: "center",
+              background:
+                "radial-gradient(circle at 30% 30%, rgba(0,255,251,0.28), rgba(0,255,251,0.10))",
+              border: "1px solid rgba(0,0,0,0.08)",
+              boxShadow: "0 16px 36px rgba(0,0,0,0.12)",
+              animation: "ots-success-pop 420ms ease",
+            }}
+          >
+            <span style={{ fontSize: 36, lineHeight: 1 }}>✅</span>
+          </div>
+
+          <div>
+            <div style={{ fontSize: 24, fontWeight: 900, color: "#111" }}>
+              Spot submitted
+            </div>
+            <div style={{ marginTop: 8, color: "#555", lineHeight: 1.45 }}>
+              Nice. Your story has been sent for review and will appear once it’s approved.
+            </div>
+          </div>
+
+          <div
+            className="ots-surface ots-surface--border"
+            style={{
+              padding: 14,
+              textAlign: "left",
+              display: "grid",
+              gap: 6,
+            }}
+          >
+            <div style={{ fontWeight: 800, color: "#111" }}>
+              {title || "Untitled Spot"}
+            </div>
+            {w3w ? (
+              <div style={{ fontSize: 13, color: "#666" }}>///{w3w}</div>
+            ) : pos ? (
+              <div style={{ fontSize: 13, color: "#666" }}>
+                {pos.lat.toFixed(6)}, {pos.lng.toFixed(6)}
+              </div>
+            ) : null}
+            <div style={{ fontSize: 13, color: "#666" }}>Redirecting…</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ padding: 16 }}>
       <h1 style={{ marginTop: 0 }}>Add a Spot</h1>
@@ -561,7 +659,18 @@ const [loadingCategories, setLoadingCategories] = useState(false);
         {loadingW3w ? "what3words…" : w3w ? `///${w3w}` : "no what3words"}
       </p>
 
-      <form onSubmit={submit} style={{ display: "grid", gap: 14, marginTop: 18 }}>
+      <form
+        onSubmit={submit}
+        style={{
+          display: "grid",
+          gap: 14,
+          marginTop: 18,
+          opacity: formLocked ? 0.92 : 1,
+          transition: "opacity 160ms ease",
+          pointerEvents: publishSuccess ? "none" : undefined,
+        }}
+        aria-busy={formLocked}
+      >
         <div className="ots-surface ots-surface--border" style={{ padding: 12 }}>
           <div style={{ fontSize: 12, fontWeight: 800, color: "#00a99a", letterSpacing: 0.2 }}>
             {stepTitle()}
@@ -656,7 +765,7 @@ const [loadingCategories, setLoadingCategories] = useState(false);
                     border: "1px solid rgba(0,0,0,0.2)",
                   }}
                 />
-                <button type="button" className="ots-btn" onClick={jumpToWhat3Words} disabled={jumping}>
+                <button type="button" className="ots-btn" onClick={jumpToWhat3Words} disabled={jumping || formLocked}>
                   {jumping ? "Going…" : "Go"}
                 </button>
               </div>
@@ -822,7 +931,7 @@ const [loadingCategories, setLoadingCategories] = useState(false);
                     type="button"
                     className="ots-btn"
                     onClick={() => addTag(tagInput)}
-                    disabled={!tagInput.trim()}
+                    disabled={!tagInput.trim() || formLocked}
                   >
                     Add tag
                   </button>
@@ -982,7 +1091,7 @@ const [loadingCategories, setLoadingCategories] = useState(false);
                   <select
                     value={groupId}
                     onChange={(e) => setGroupId(e.target.value)}
-                    disabled={loadingGroups}
+                    disabled={loadingGroups || formLocked}
                     style={{
                       padding: 10,
                       borderRadius: 12,
@@ -1042,7 +1151,7 @@ const [loadingCategories, setLoadingCategories] = useState(false);
               type="button"
               className="ots-btn"
               onClick={() => confirmLocationAndMaybeAdvance(false)}
-              disabled={!canContinueFromStep1()}
+              disabled={!canContinueFromStep1() || formLocked}
               style={{ flex: 1, minWidth: 180, fontWeight: 800 }}
             >
               Confirm location
@@ -1054,7 +1163,7 @@ const [loadingCategories, setLoadingCategories] = useState(false);
               type="button"
               className="ots-btn"
               onClick={() => setStep(3)}
-              disabled={!canContinueFromStep2()}
+              disabled={!canContinueFromStep2() || formLocked}
               style={{ flex: 1, minWidth: 180, fontWeight: 800 }}
             >
               Continue to extras
@@ -1065,10 +1174,10 @@ const [loadingCategories, setLoadingCategories] = useState(false);
             <button
               type="submit"
               className="ots-btn"
-              disabled={submitting}
+              disabled={formLocked}
               style={{ flex: 1, minWidth: 180, fontWeight: 800 }}
             >
-              {submitting ? "Publishing…" : "Publish Spot"}
+              {submitting ? "Publishing your Spot…" : "Publish Spot"}
             </button>
           )}
         </div>

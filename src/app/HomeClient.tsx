@@ -155,6 +155,18 @@ function TagPills(props: { tags?: string[] | null; max?: number }) {
   );
 }
 
+function vibrateLight() {
+  if (typeof window !== "undefined" && "vibrate" in navigator) {
+    navigator.vibrate(10);
+  }
+}
+
+function vibrateSuccess() {
+  if (typeof window !== "undefined" && "vibrate" in navigator) {
+    navigator.vibrate([12, 30, 18]);
+  }
+}
+
 export default function HomePage() {
   const supabase = getSupabaseBrowser();
 
@@ -563,9 +575,11 @@ export default function HomePage() {
 
   function selectSpot(s: Spot) {
     setSelected(s);
+    vibrateLight();
     if (isMobile) setMobileListSnap("peek");
 
     setPulsingMarkerId(s.id);
+    vibrateSuccess();
     if (markerPulseTimeoutRef.current != null) {
       window.clearTimeout(markerPulseTimeoutRef.current);
     }
@@ -696,6 +710,7 @@ export default function HomePage() {
 
     if (delta > 90) {
       setShowFilters(false);
+      vibrateLight();
     }
 
     resetFilterSheetDrag();
@@ -740,6 +755,7 @@ export default function HomePage() {
     // If user dragged far enough, close the sheet
     if (delta > 120) {
       setSelected(null);
+      vibrateLight();
     }
 
     resetSpotSheetDrag();
