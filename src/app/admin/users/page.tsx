@@ -181,7 +181,7 @@ export default function AdminUsersPage() {
       }
     >
       <div style={{ padding: 16, maxWidth: 900, margin: "0 auto" }}>
-        <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 12, color: "#111" }}>
+        <h1 className="ots-h1" style={{ fontSize: 22, fontWeight: 800, marginBottom: 12, color: "#111" }}>
           Users
         </h1>
 
@@ -277,7 +277,7 @@ export default function AdminUsersPage() {
               }}
             >
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: 15, color: "#111" }}>
+                <div className="ots-brand-heading" style={{ fontWeight: 700, fontSize: 15, color: "#111" }}>
                   {u.email ?? "(no email)"}{" "}
                   <span style={{ fontWeight: 400, color: "#666" }}>
                     · {u.id.slice(0, 8)}…
@@ -346,11 +346,11 @@ export default function AdminUsersPage() {
           ))}
 
           {!loading && rows.length === 0 && (
-            <div style={{ padding: 16, color: "#555" }}>No users found.</div>
+            <div className="ots-story-text" style={{ padding: 16, color: "#555", fontSize: 14 }}>No users found.</div>
           )}
         </div>
 
-        <div style={{ marginTop: 14, fontSize: 13, color: "#666" }}>
+        <div className="ots-story-text" style={{ marginTop: 14, fontSize: 13, color: "#666" }}>
           Tip: Give friends/family <strong>super</strong>. Keep <strong>admin</strong> for you.
         </div>
 
@@ -389,7 +389,7 @@ export default function AdminUsersPage() {
                 }}
               >
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: 800, fontSize: 16, color: "#111" }}>
+                  <div className="ots-brand-heading" style={{ fontWeight: 800, fontSize: 16, color: "#111" }}>
                     Credit Ledger (last 10)
                   </div>
                   {auditUser && (
@@ -443,7 +443,7 @@ export default function AdminUsersPage() {
                             gap: 12,
                           }}
                         >
-                          <div style={{ fontWeight: 700, color: "#111" }}>
+                          <div className="ots-brand-heading" style={{ fontWeight: 700, color: "#111" }}>
                             {r.delta > 0 ? `+${r.delta}` : `${r.delta}`} · {r.reason}
                           </div>
                           <div style={{ fontSize: 12, color: "#666" }}>

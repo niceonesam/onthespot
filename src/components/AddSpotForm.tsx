@@ -615,10 +615,10 @@ const [loadingCategories, setLoadingCategories] = useState(false);
           </div>
 
           <div>
-            <div style={{ fontSize: 24, fontWeight: 900, color: "#111" }}>
+            <div className="ots-brand-heading" style={{ fontSize: 24, fontWeight: 900, color: "#111" }}>
               Spot submitted
             </div>
-            <div style={{ marginTop: 8, color: "#555", lineHeight: 1.45 }}>
+            <div className="ots-story-text" style={{ marginTop: 8, color: "#555", lineHeight: 1.45, fontSize: 15 }}>
               Nice. Your story has been sent for review and will appear once it’s approved.
             </div>
           </div>
@@ -632,7 +632,7 @@ const [loadingCategories, setLoadingCategories] = useState(false);
               gap: 6,
             }}
           >
-            <div style={{ fontWeight: 800, color: "#111" }}>
+            <div className="ots-brand-heading" style={{ fontWeight: 800, color: "#111" }}>
               {title || "Untitled Spot"}
             </div>
             {w3w ? (
@@ -651,9 +651,9 @@ const [loadingCategories, setLoadingCategories] = useState(false);
 
   return (
     <div style={{ padding: 16 }}>
-      <h1 style={{ marginTop: 0 }}>Add a Spot</h1>
+      <h1 className="ots-h1" style={{ marginTop: 0 }}>Add a Spot</h1>
 
-      <p style={{ opacity: 0.75, marginTop: 8 }}>
+      <p className="ots-story-text" style={{ opacity: 0.75, marginTop: 8, fontSize: 14 }}>
         Chosen location: {pos.lat.toFixed(6)}, {pos.lng.toFixed(6)}
         {" • "}
         {loadingW3w ? "what3words…" : w3w ? `///${w3w}` : "no what3words"}
@@ -708,8 +708,8 @@ const [loadingCategories, setLoadingCategories] = useState(false);
               }}
             >
               <div>
-                <div style={{ fontWeight: 800, color: "#111" }}>Where is the spot?</div>
-                <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
+                <div className="ots-brand-heading" style={{ fontWeight: 800, color: "#111" }}>Where is the spot?</div>
+                <div className="ots-story-text" style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
                   Drag the pin or tap the map to place the spot exactly.
                 </div>
               </div>
@@ -772,7 +772,7 @@ const [loadingCategories, setLoadingCategories] = useState(false);
             )}
 
             {!w3wAvailable && (
-              <p style={{ opacity: 0.7, marginTop: 0, marginBottom: 12 }}>
+              <p className="ots-story-text" style={{ opacity: 0.7, marginTop: 0, marginBottom: 12, fontSize: 14 }}>
                 what3words search unavailable — use the map to set the exact spot.
               </p>
             )}
@@ -812,7 +812,7 @@ const [loadingCategories, setLoadingCategories] = useState(false);
               className="ots-surface ots-surface--border"
               style={{ padding: 12, marginTop: 12, display: "grid", gap: 6 }}
             >
-              <div style={{ fontWeight: 700, color: "#111" }}>Chosen location</div>
+              <div className="ots-brand-heading" style={{ fontWeight: 700, color: "#111" }}>Chosen location</div>
               <div style={{ fontSize: 13, color: "#333" }}>
                 {pos.lat.toFixed(6)}, {pos.lng.toFixed(6)}
               </div>
@@ -825,7 +825,7 @@ const [loadingCategories, setLoadingCategories] = useState(false);
 
         {step === 2 && (
           <div className="ots-surface ots-surface--border" style={{ padding: 14 }}>
-            <div style={{ fontWeight: 800, color: "#111", marginBottom: 10 }}>
+            <div className="ots-brand-heading" style={{ fontWeight: 800, color: "#111", marginBottom: 10 }}>
               Tell the story
             </div>
 
@@ -1014,7 +1014,7 @@ const [loadingCategories, setLoadingCategories] = useState(false);
 
         {step === 3 && (
           <div className="ots-surface ots-surface--border" style={{ padding: 14 }}>
-            <div style={{ fontWeight: 800, color: "#111", marginBottom: 10 }}>
+            <div className="ots-brand-heading" style={{ fontWeight: 800, color: "#111", marginBottom: 10 }}>
               Extras
             </div>
 

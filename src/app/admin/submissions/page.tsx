@@ -187,7 +187,7 @@ export default function AdminSubmissionsPage() {
               }}
             >
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: 16, color: "#111" }}>
+                <div className="ots-brand-heading" style={{ fontWeight: 700, fontSize: 16, color: "#111" }}>
                   {s.title}
                 </div>
                 <div style={{ fontSize: 13, color: "#555", marginTop: 2 }}>
@@ -222,7 +222,7 @@ export default function AdminSubmissionsPage() {
               )}
             </div>
 
-            <div style={{ fontSize: 14, color: "#222", whiteSpace: "pre-wrap" }}>
+            <div className="ots-story-text" style={{ fontSize: 14, color: "#222", whiteSpace: "pre-wrap" }}>
               {s.description}
             </div>
 
@@ -261,7 +261,7 @@ export default function AdminSubmissionsPage() {
         ))}
 
         {!loading && rows.length === 0 && (
-          <div style={{ padding: 16, color: "#555" }}>
+          <div className="ots-story-text" style={{ padding: 16, color: "#555", fontSize: 14 }}>
             No submissions in <strong>{filter}</strong>.
           </div>
         )}

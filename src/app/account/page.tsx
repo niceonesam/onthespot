@@ -922,14 +922,16 @@ export default function AccountPage() {
           style={{ padding: 12 }}
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            <strong>Signed in as</strong>
+            <strong className="ots-brand-heading">Signed in as</strong>
             <form action="/auth/logout" method="post">
               <button type="submit" className="ots-btn" disabled={!userId}>
                 Log out
               </button>
             </form>
           </div>
-          <div style={{ marginTop: 6, opacity: 0.85 }}>{email ?? "(not signed in)"}</div>
+          <div className="ots-story-text" style={{ marginTop: 6, opacity: 0.85, fontSize: 14 }}>
+            {email ?? "(not signed in)"}
+          </div>
 
           {/* Profile photo */}
           <div
@@ -1105,7 +1107,7 @@ export default function AccountPage() {
               </div>
             )}
 
-            <div style={{ marginTop: 6, fontSize: 12, color: "#666" }}>
+            <div className="ots-story-text" style={{ marginTop: 6, fontSize: 12, color: "#666" }}>
               This resets the intro tour across all devices.
             </div>
           </div>
@@ -1115,7 +1117,7 @@ export default function AccountPage() {
           className="ots-surface ots-surface--border"
           style={{ padding: 12 }}
         >
-          <strong>Groups</strong>
+          <strong className="ots-brand-heading">Groups</strong>
 
           <div style={{ marginTop: 10, display: "grid", gap: 12 }}>
             {/* Create group */}
@@ -1187,7 +1189,7 @@ export default function AccountPage() {
                   alignItems: "center",
                 }}
               >
-                <strong style={{ fontSize: 14 }}>My groups</strong>
+                <strong className="ots-brand-heading" style={{ fontSize: 14 }}>My groups</strong>
                 {loadingGroups ? (
                   <span style={{ opacity: 0.7 }}>Loading…</span>
                 ) : null}
@@ -1234,9 +1236,9 @@ export default function AccountPage() {
                             {g.name}
                           </div>
 
-                          <div style={{ fontSize: 12, opacity: 0.75 }}>
-                            Invite code: <code>{g.invite_code}</code>
-                          </div>
+                          <div className="ots-story-text" style={{ fontSize: 12, opacity: 0.75 }}>
+                          Invite code: <code>{g.invite_code}</code>
+                        </div>
                         </div>
 
                         <div style={{ display: "flex", gap: 8 }}>
@@ -1265,7 +1267,7 @@ export default function AccountPage() {
 
             {/* Add friend to selected group */}
             <div style={{ display: "grid", gap: 8 }}>
-              <strong style={{ fontSize: 14 }}>
+              <strong className="ots-brand-heading" style={{ fontSize: 14 }}>
                 Add a friend to the selected group
               </strong>
 
@@ -1309,7 +1311,7 @@ export default function AccountPage() {
                 </button>
               </div>
 
-              <div style={{ fontSize: 12, opacity: 0.75 }}>
+              <div className="ots-story-text" style={{ fontSize: 12, opacity: 0.75 }}>
                 Tip: group membership is what unlocks{" "}
                 <code>visibility = "group"</code> spots.
               </div>
@@ -1331,8 +1333,8 @@ export default function AccountPage() {
               flexWrap: "wrap",
             }}
           >
-            <strong>Friends</strong>
-            <div style={{ fontSize: 12, opacity: 0.7 }}>
+            <strong className="ots-brand-heading">Friends</strong>
+            <div className="ots-story-text" style={{ fontSize: 12, opacity: 0.7 }}>
               Add people, manage requests, and see your current friends.
             </div>
           </div>
@@ -1340,7 +1342,9 @@ export default function AccountPage() {
           <div style={{ marginTop: 14, display: "grid", gap: 16 }}>
             {/* Add a friend */}
             <div>
-              <div style={{ fontWeight: 700, color: "#111" }}>Add a friend</div>
+              <div className="ots-brand-heading" style={{ fontWeight: 700, color: "#111" }}>
+                Add a friend
+              </div>
               <div
                 style={{
                   marginTop: 10,
@@ -1386,7 +1390,7 @@ export default function AccountPage() {
               }}
             >
               <div className="ots-surface ots-surface--border" style={{ padding: 12 }}>
-                <strong style={{ fontSize: 14 }}>Incoming requests</strong>
+                <strong className="ots-brand-heading" style={{ fontSize: 14 }}>Incoming requests</strong>
                 {loading ? (
                   <div style={{ marginTop: 10 }}>Loading…</div>
                 ) : incoming.length === 0 ? (
@@ -1427,7 +1431,7 @@ export default function AccountPage() {
               </div>
 
               <div className="ots-surface ots-surface--border" style={{ padding: 12 }}>
-                <strong style={{ fontSize: 14 }}>Outgoing requests</strong>
+                <strong className="ots-brand-heading" style={{ fontSize: 14 }}>Outgoing requests</strong>
                 {loading ? (
                   <div style={{ marginTop: 10 }}>Loading…</div>
                 ) : outgoing.length === 0 ? (
@@ -1450,7 +1454,9 @@ export default function AccountPage() {
 
             {/* Current friends */}
             <div>
-              <div style={{ fontWeight: 700, color: "#111" }}>Your friends</div>
+              <div className="ots-brand-heading" style={{ fontWeight: 700, color: "#111" }}>
+                Your friends
+              </div>
               {loading ? (
                 <div style={{ marginTop: 10 }}>Loading…</div>
               ) : friends.length === 0 ? (
@@ -1474,7 +1480,9 @@ export default function AccountPage() {
                       >
                         <div style={{ minWidth: 0 }}>
                           <div style={{ fontWeight: 700, color: "#111" }}>{userLabel(other)}</div>
-                          <div style={{ fontSize: 12, opacity: 0.7 }}>Connected</div>
+                          <div className="ots-story-text" style={{ fontSize: 12, opacity: 0.7 }}>
+                            Connected
+                          </div>
                         </div>
                         <button
                           type="button"
