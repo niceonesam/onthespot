@@ -25,47 +25,39 @@ function LoginInner() {
         placeItems: "center",
         padding: 20,
         background:
-          "radial-gradient(1200px 600px at 20% 10%, rgba(0,255,251,0.14), transparent 55%), radial-gradient(900px 500px at 80% 30%, rgba(255,183,0,0.14), transparent 55%), linear-gradient(180deg, rgba(0,0,0,0.02), rgba(0,0,0,0.04))",
+          "radial-gradient(1200px 600px at 20% 10%, rgba(31,182,166,0.10), transparent 55%), radial-gradient(900px 500px at 80% 30%, rgba(230,179,37,0.12), transparent 55%), linear-gradient(180deg, rgba(15,42,68,0.03), rgba(15,42,68,0.05))",
       }}
     >
       <div
         className="ots-surface ots-surface--shadow"
         style={{
-          width: "min(440px, 100%)",
-          padding: 18,
+          width: "min(480px, 100%)",
+          padding: 26,
+          borderRadius: 22,
+          border: "1px solid rgba(15,42,68,0.08)",
+          background: "rgba(255,255,255,0.94)",
+          boxShadow: "0 18px 50px rgba(15,42,68,0.12)",
         }}
       >
         {/* Brand */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-          <div
-            aria-hidden="true"
+        <div style={{ display: "grid", gap: 12, marginBottom: 18 }}>
+          <img
+            src="/brand/onthespot-logo.svg"
+            alt="OnTheSpot"
             style={{
-              width: 38,
-              height: 38,
-              borderRadius: 14,
-              display: "grid",
-              placeItems: "center",
-              background: "rgba(0,255,251,0.12)",
-              border: "1px solid rgba(0,0,0,0.08)",
+              display: "block",
+              height: 40,
+              width: "auto",
+              maxWidth: "min(72vw, 240px)",
+              objectFit: "contain",
             }}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" style={{ display: "block" }}>
-              <path
-                d="M12 22s7-4.35 7-11a7 7 0 1 0-14 0c0 6.65 7 11 7 11z"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              />
-              <circle cx="12" cy="11" r="2.5" fill="#ffb700" />
-            </svg>
-          </div>
+          />
 
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 22, fontWeight: 900, lineHeight: 1.1, color: "#111" }}>
-              OnTheSpot
-            </div>
-            <div style={{ color: "#555", fontSize: 13, marginTop: 2 }}>
-              {mode === "login" ? "Log in to continue" : "Create an account"}
+            <div className="ots-story-text" style={{ color: "#555", fontSize: 15, lineHeight: 1.5 }}>
+              {mode === "login"
+                ? "Log in to continue discovering nearby stories."
+                : "Create an account and start discovering stories hidden in the world around you."}
             </div>
           </div>
         </div>
@@ -78,11 +70,11 @@ function LoginInner() {
             display: "grid",
             gridTemplateColumns: "1fr 1fr",
             gap: 8,
-            background: "rgba(0,0,0,0.04)",
+            background: "rgba(15,42,68,0.04)",
             padding: 6,
-            borderRadius: 14,
-            border: "1px solid rgba(0,0,0,0.06)",
-            marginBottom: 14,
+            borderRadius: 16,
+            border: "1px solid rgba(15,42,68,0.08)",
+            marginBottom: 20,
           }}
         >
           <button
@@ -92,9 +84,10 @@ function LoginInner() {
             onClick={() => setMode("login")}
             className="ots-btn"
             style={{
-              border: "1px solid rgba(0,0,0,0.10)",
+              border: "1px solid rgba(15,42,68,0.10)",
               background: mode === "login" ? "white" : "transparent",
-              boxShadow: mode === "login" ? "0 6px 18px rgba(0,0,0,0.10)" : "none",
+              boxShadow: mode === "login" ? "0 6px 18px rgba(15,42,68,0.10)" : "none",
+              fontWeight: 800,
             }}
           >
             Log in
@@ -106,9 +99,10 @@ function LoginInner() {
             onClick={() => setMode("signup")}
             className="ots-btn"
             style={{
-              border: "1px solid rgba(0,0,0,0.10)",
+              border: "1px solid rgba(15,42,68,0.10)",
               background: mode === "signup" ? "white" : "transparent",
-              boxShadow: mode === "signup" ? "0 6px 18px rgba(0,0,0,0.10)" : "none",
+              boxShadow: mode === "signup" ? "0 6px 18px rgba(15,42,68,0.10)" : "none",
+              fontWeight: 800,
             }}
           >
             Sign up
@@ -121,31 +115,31 @@ function LoginInner() {
           onSubmit={() => {
             setSubmitting(true);
           }}
-          style={{ display: "grid", gap: 12 }}
+          style={{ display: "grid", gap: 16 }}
         >
           <input type="hidden" name="next" value={next} />
 
-          <label style={{ display: "grid", gap: 6 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#111" }}>Email</span>
+          <label style={{ display: "grid", gap: 8 }}>
+            <span className="ots-brand-heading" style={{ fontSize: 15, color: "#111", letterSpacing: "0.01em" }}>Email</span>
             <input
               name="email"
               placeholder="you@example.com"
               autoComplete="email"
               className="ots-input"
-              style={{ color: "#111" }}
+              style={{ color: "#111", minHeight: 52 }}
               required
             />
           </label>
 
-          <label style={{ display: "grid", gap: 6 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#111" }}>Password</span>
+          <label style={{ display: "grid", gap: 8 }}>
+            <span className="ots-brand-heading" style={{ fontSize: 15, color: "#111", letterSpacing: "0.01em" }}>Password</span>
             <input
               name="password"
               placeholder={mode === "signup" ? "Create a password" : "Your password"}
               type={showPassword ? "text" : "password"}
               autoComplete={mode === "signup" ? "new-password" : "current-password"}
               className="ots-input"
-              style={{ color: "#111" }}
+              style={{ color: "#111", minHeight: 52 }}
               required
             />
             <button
@@ -157,8 +151,10 @@ function LoginInner() {
                 padding: "6px 10px",
                 borderRadius: 999,
                 fontSize: 12,
-                border: "1px solid rgba(0,0,0,0.18)",
-                background: "white",
+                border: "1px solid rgba(15,42,68,0.16)",
+                background: "rgba(255,255,255,0.92)",
+                color: "#0F2A44",
+                fontWeight: 700,
               }}
             >
               {showPassword ? "Hide password" : "Show password"}
@@ -170,9 +166,12 @@ function LoginInner() {
             className="ots-btn"
             disabled={submitting}
             style={{
-              borderColor: "rgba(0,0,0,0.18)",
-              background: "linear-gradient(180deg, rgba(0,255,251,0.20), rgba(0,255,251,0.08))",
+              borderColor: "rgba(15,42,68,0.14)",
+              background: "linear-gradient(180deg, rgba(31,182,166,0.20), rgba(31,182,166,0.10))",
+              color: "#0F2A44",
               fontWeight: 800,
+              minHeight: 52,
+              boxShadow: "0 10px 24px rgba(31,182,166,0.14)",
             }}
           >
             {submitting ? "Working…" : mode === "login" ? "Continue" : "Create account"}
@@ -182,8 +181,8 @@ function LoginInner() {
             <div
               role="alert"
               style={{
-                background: "rgba(255,183,0,0.14)",
-                border: "1px solid rgba(255,183,0,0.35)",
+                background: "rgba(220, 38, 38, 0.10)",
+                border: "1px solid rgba(220, 38, 38, 0.24)",
                 padding: 12,
                 borderRadius: 12,
                 color: "#333",
@@ -198,8 +197,8 @@ function LoginInner() {
             <div
               role="status"
               style={{
-                background: "rgba(0,255,251,0.10)",
-                border: "1px solid rgba(0,0,0,0.08)",
+                background: "rgba(31,182,166,0.10)",
+                border: "1px solid rgba(15,42,68,0.08)",
                 padding: 12,
                 borderRadius: 12,
                 color: "#333",
@@ -211,14 +210,14 @@ function LoginInner() {
             </div>
           )}
 
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 4 }}>
-            <span style={{ fontSize: 12, color: "#666" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 14, marginTop: 2, alignItems: "start" }}>
+            <span className="ots-story-text" style={{ fontSize: 12, color: "#666", lineHeight: 1.5 }}>
               By continuing you agree to OnTheSpot’s terms and privacy policy.
             </span>
             <a
               href="/auth/forgot"
               className="ots-link"
-              style={{ fontSize: 12, color: "#0b57d0", whiteSpace: "nowrap" }}
+              style={{ fontSize: 12, whiteSpace: "nowrap", fontWeight: 700 }}
             >
               Forgot password?
             </a>
@@ -238,24 +237,21 @@ function LoginFallback() {
         placeItems: "center",
         padding: 20,
         background:
-          "radial-gradient(1200px 600px at 20% 10%, rgba(0,255,251,0.14), transparent 55%), radial-gradient(900px 500px at 80% 30%, rgba(255,183,0,0.14), transparent 55%), linear-gradient(180deg, rgba(0,0,0,0.02), rgba(0,0,0,0.04))",
+          "radial-gradient(1200px 600px at 20% 10%, rgba(31,182,166,0.10), transparent 55%), radial-gradient(900px 500px at 80% 30%, rgba(230,179,37,0.12), transparent 55%), linear-gradient(180deg, rgba(15,42,68,0.03), rgba(15,42,68,0.05))",
       }}
     >
-      <div className="ots-surface ots-surface--shadow" style={{ width: "min(440px, 100%)", padding: 18 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-          <div style={{ width: 38, height: 38, borderRadius: 14, background: "#dbeafe" }} />
-          <div style={{ flex: 1 }}>
-            <div style={{ height: 18, width: 140, borderRadius: 10, background: "#e5e7eb" }} />
-            <div style={{ height: 12, width: 220, borderRadius: 10, background: "#eef2f7", marginTop: 8 }} />
-          </div>
+      <div className="ots-surface ots-surface--shadow" style={{ width: "min(480px, 100%)", padding: 26, borderRadius: 22, border: "1px solid rgba(15,42,68,0.08)", background: "rgba(255,255,255,0.94)", boxShadow: "0 18px 50px rgba(15,42,68,0.12)" }}>
+        <div style={{ display: "grid", gap: 12, marginBottom: 18 }}>
+          <div style={{ height: 40, width: 220, borderRadius: 10, background: "#e5e7eb" }} />
+          <div style={{ height: 14, width: "86%", borderRadius: 10, background: "#eef2f7" }} />
         </div>
 
-        <div style={{ height: 44, width: "100%", borderRadius: 14, background: "#eef2f7" }} />
-        <div style={{ height: 14, width: 120, borderRadius: 10, background: "#eef2f7", marginTop: 14 }} />
-        <div style={{ height: 42, width: "100%", borderRadius: 12, background: "#e5e7eb", marginTop: 8 }} />
-        <div style={{ height: 14, width: 120, borderRadius: 10, background: "#eef2f7", marginTop: 14 }} />
-        <div style={{ height: 42, width: "100%", borderRadius: 12, background: "#e5e7eb", marginTop: 8 }} />
-        <div style={{ height: 42, width: "100%", borderRadius: 12, background: "#eef2f7", marginTop: 14 }} />
+        <div style={{ height: 52, width: "100%", borderRadius: 16, background: "#eef2f7" }} />
+        <div style={{ height: 14, width: 120, borderRadius: 10, background: "#eef2f7", marginTop: 18 }} />
+        <div style={{ height: 52, width: "100%", borderRadius: 12, background: "#e5e7eb", marginTop: 10 }} />
+        <div style={{ height: 14, width: 120, borderRadius: 10, background: "#eef2f7", marginTop: 18 }} />
+        <div style={{ height: 52, width: "100%", borderRadius: 12, background: "#e5e7eb", marginTop: 10 }} />
+        <div style={{ height: 52, width: "100%", borderRadius: 12, background: "#eef2f7", marginTop: 18 }} />
       </div>
     </div>
   );
