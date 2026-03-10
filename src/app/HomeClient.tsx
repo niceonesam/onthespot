@@ -1075,7 +1075,9 @@ export default function HomePage() {
                   </div>
 
                   <div style={{ minWidth: 0 }}>
-                    <strong style={{ fontSize: 18, color: "#111" }}>Welcome to OnTheSpot</strong>
+                    <strong className="ots-brand-heading" style={{ fontSize: 18, color: "#111" }}>
+                      Welcome to OnTheSpot
+                    </strong>
                     <div style={{ marginTop: 2, fontSize: 13, color: "#555" }}>
                       A quick tour so the map doesn’t feel like a mysterious glowing rectangle.
                     </div>
@@ -1154,10 +1156,13 @@ export default function HomePage() {
                 </div>
 
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: 900, color: "#111", fontSize: 16 }}>
+                  <div className="ots-brand-heading ots-brand-heading--gold" style={{ fontWeight: 900, color: "#111", fontSize: 16 }}>
                     {ONBOARDING_STEPS[onboardingStep]?.title}
                   </div>
-                  <div style={{ marginTop: 6, color: "#333", lineHeight: 1.35 }}>
+                  <div
+                    className="ots-story-text"
+                    style={{ marginTop: 6, color: "#333", lineHeight: 1.35, fontSize: 15 }}
+                  >
                     {ONBOARDING_STEPS[onboardingStep]?.body}
                   </div>
                 </div>
@@ -1756,7 +1761,9 @@ export default function HomePage() {
                   }}
                 >
                   <div>
-                    <h3 style={{ margin: 0 }}>Nearby Spots</h3>
+                    <h3 className="ots-brand-heading">
+                      Nearby Spots
+                    </h3>
                     {isMobile && (
                       <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
                         {filteredSpots.length} found nearby {mobileListSnap === "peek" ? "• tap to expand" : mobileListSnap === "half" ? "• tap for full list" : ""}
@@ -1798,7 +1805,10 @@ export default function HomePage() {
                       }}
                     >
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontWeight: 900, color: "#111", lineHeight: 1.15, fontSize: 16 }}>
+                        <div
+                          className="ots-brand-heading"
+                          style={{ fontWeight: 900, color: "#111", lineHeight: 1.15, fontSize: 16 }}
+                        >
                           {filteredSpots[0].title}
                         </div>
                         <TagPills tags={filteredSpots[0].tags} max={2} />
@@ -1813,6 +1823,7 @@ export default function HomePage() {
                     </div>
 
                     <div
+                      className="ots-story-text"
                       style={{
                         fontSize: 13,
                         opacity: 0.8,
@@ -1886,7 +1897,12 @@ export default function HomePage() {
                           >
                             <div style={{ minWidth: 0, flex: 1 }}>
                               <div style={{ display: "flex", gap: 8, alignItems: "center", minWidth: 0 }}>
-                                <strong style={{ lineHeight: 1.15, fontSize: 16, color: "#111" }}>{s.title}</strong>
+                                <strong
+                                  className="ots-brand-heading"
+                                  style={{ lineHeight: 1.15, fontSize: 16, color: "#111" }}
+                                >
+                                  {s.title}
+                                </strong>
                                 <VisibilityBadge visibility={s.visibility} />
                               </div>
                               <TagPills tags={s.tags} max={3} />
@@ -1924,6 +1940,7 @@ export default function HomePage() {
                           </div>
 
                           <div
+                            className="ots-story-text"
                             style={{
                               marginTop: 6,
                               opacity: 0.85,
@@ -2129,6 +2146,7 @@ export default function HomePage() {
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{ display: "flex", gap: 8, alignItems: "center", minWidth: 0, flexWrap: "wrap" }}>
                       <h3
+                        className="ots-brand-heading"
                         style={{
                           margin: 0,
                           fontSize: selectedSheetIsPeek ? 18 : 22,
@@ -2216,7 +2234,7 @@ export default function HomePage() {
                 )}
 
                 {!selectedSheetIsPeek && (
-                  <p style={{ marginTop: 10 }}>
+                  <p className="ots-story-text" style={{ marginTop: 10 }}>
                     {selectedSheetIsHalf && selected.description.length > 180
                       ? selected.description.slice(0, 180) + "…"
                       : selected.description}

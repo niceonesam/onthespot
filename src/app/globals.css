@@ -3,6 +3,11 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --ots-blue: #0F2A44;
+  --ots-gold: #E6B325;
+  --ots-teal: #1FB6A6;
+  --ots-grey: #6B7280;
+  --ots-paper: #F9FAFB;
 }
 
 @theme inline {
@@ -82,7 +87,7 @@ body {
 }
 
 .ots-surface a {
-  color: #ffb700;
+  color: var(--ots-gold);
 }
 
 /* Map center crosshair */
@@ -308,8 +313,10 @@ html, body {
 .ots-brand-title {
   font-size: 18px;
   font-weight: 800;
-  color: #111;
+  color: var(--ots-blue);
   line-height: 1.1;
+  font-family: var(--font-brand);
+  letter-spacing: -0.02em;
 }
 
 .ots-brand-subtitle {
@@ -322,11 +329,14 @@ html, body {
   font-size: 22px;
   font-weight: 800;
   margin: 8px 0 12px;
-  color: #111;
+  color: var(--ots-blue);
+  font-family: var(--font-brand);
+  letter-spacing: -0.02em;
+  line-height: 1.15;
 }
 
 .ots-link {
-  color: #0b57d0;
+  color: var(--ots-teal);
   text-decoration: none;
 }
 
@@ -458,4 +468,37 @@ html, body {
   0% { opacity: 0.55; }
   50% { opacity: 1; }
   100% { opacity: 0.55; }
+}
+
+:root {
+  --font-brand: "Poppins", sans-serif;
+  --font-ui: "Inter", system-ui, sans-serif;
+  --font-story: Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif;
+}
+
+html,
+body {
+  font-family: var(--font-ui);
+}
+
+.ots-brand-heading {
+  font-family: var(--font-brand);
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: var(--ots-blue);
+}
+
+.ots-brand-heading--gold {
+  color: var(--ots-gold);
+}
+
+.ots-story-text {
+  font-family: var(--font-story);
+  font-size: 1.02rem;
+  line-height: 1.65;
+  color: #333;
+}
+
+.ots-ui-text {
+  font-family: var(--font-ui);
 }
