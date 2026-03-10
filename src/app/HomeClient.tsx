@@ -210,6 +210,40 @@ export default function HomePage() {
   const markerPulseTimeoutRef = useRef<number | null>(null);
   const mapPanTimeoutRef = useRef<number | null>(null);
 
+  function panSelectedSpotIntoView(lat: number, lng: number) {
+    if (!map) return;
+
+    const projection = map.getProjection();
+    const zoom = map.getZoom();
+    if (!projection || zoom == null) return;
+
+    const scale = Math.pow(2, zoom);
+    const worldPoint = projection.fromLatLngToPoint(
+      new google.maps.LatLng(lat, lng)
+    );
+    if (!worldPoint) return;
+
+    const yOffsetPixels = isMobile ? 136 : 0;
+
+    const pixelPoint = new google.maps.Point(
+      worldPoint.x * scale,
+      worldPoint.y * scale
+    );
+
+    const adjusted = new google.maps.Point(
+      pixelPoint.x,
+      pixelPoint.y - yOffsetPixels
+    );
+
+    const adjustedLatLng = projection.fromPointToLatLng(
+      new google.maps.Point(adjusted.x / scale, adjusted.y / scale)
+    );
+
+    if (!adjustedLatLng) return;
+
+    map.panTo(adjustedLatLng);
+  }
+
   const [showFilters, setShowFilters] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileListSnap, setMobileListSnap] = useState<"peek" | "half" | "full">("peek");
@@ -315,11 +349,48 @@ export default function HomePage() {
     };
   }, [userId, supabase]);
 
+  function discoveryScore(s: Spot) {
+    const distance = Number(s.distance_m ?? 999999);
+    const descriptionLength = s.description?.trim().length ?? 0;
+    const confidence = 3;
+
+    const distanceScore =
+      distance < 150 ? 40 :
+      distance < 400 ? 28 :
+      distance < 1000 ? 18 :
+      distance < 2500 ? 8 : 0;
+
+    const confidenceScore = confidence * 8;
+    const sourceScore = s.source_url ? 10 : 0;
+    const photoScore = s.photo_url ? 8 : 0;
+    const tagScore = Array.isArray(s.tags) ? Math.min(s.tags.length, 5) * 2 : 0;
+    const descriptionScore =
+      descriptionLength > 180 ? 8 :
+      descriptionLength > 80 ? 4 : 0;
+    const importedPenalty = s.is_imported ? 0 : 2;
+
+    return (
+      distanceScore +
+      confidenceScore +
+      sourceScore +
+      photoScore +
+      tagScore +
+      descriptionScore +
+      importedPenalty
+    );
+  }
+
   const filteredSpots = spots.filter((s) => {
     const catOk = categoryFilter === "all" || s.category === categoryFilter;
     const vis = (s as any).visibility ?? "public";
     const visOk = visibilityFilter === "all" || vis === visibilityFilter;
     return catOk && visOk;
+  });
+
+  const rankedFilteredSpots = [...filteredSpots].sort((a, b) => {
+    const scoreDiff = discoveryScore(b) - discoveryScore(a);
+    if (scoreDiff !== 0) return scoreDiff;
+    return Number(a.distance_m ?? 999999) - Number(b.distance_m ?? 999999);
   });
 
   const availableTags = Array.from(
@@ -720,17 +791,10 @@ export default function HomePage() {
     }
 
     if (map) {
-      map.panTo({ lat: s.lat_out, lng: s.lng_out });
+      panSelectedSpotIntoView(s.lat_out, s.lng_out);
 
       const z = map.getZoom();
       if (typeof z === "number" && z < 13) map.setZoom(13);
-
-      if (isMobile) {
-        mapPanTimeoutRef.current = window.setTimeout(() => {
-          map.panBy(0, 136);
-          mapPanTimeoutRef.current = null;
-        }, 110);
-      }
     }
   }
 
@@ -1844,7 +1908,7 @@ export default function HomePage() {
                     </h3>
                     {isMobile && (
                       <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
-                        {filteredSpots.length} found nearby {mobileListSnap === "peek" ? "• tap to expand" : mobileListSnap === "half" ? "• tap for full list" : ""}
+                        {rankedFilteredSpots.length} found nearby {mobileListSnap === "peek" ? "• tap to expand" : mobileListSnap === "half" ? "• tap for full list" : ""}
                       </div>
                     )}
                   </div>
@@ -1864,7 +1928,7 @@ export default function HomePage() {
                   )}
                 </div>
 
-                {isMobile && mobileListSnap === "peek" && filteredSpots.length > 0 && (
+                {isMobile && mobileListSnap === "peek" && rankedFilteredSpots.length > 0 && (
                   <div
                     className="ots-surface ots-surface--border"
                     style={{
@@ -1887,16 +1951,16 @@ export default function HomePage() {
                           className="ots-brand-heading"
                           style={{ fontWeight: 900, color: "#111", lineHeight: 1.15, fontSize: 16 }}
                         >
-                          {filteredSpots[0].title}
+                          {rankedFilteredSpots[0].title}
                         </div>
-                        <TagPills tags={filteredSpots[0].tags} max={2} />
+                        <TagPills tags={rankedFilteredSpots[0].tags} max={2} />
                         <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
-                          {filteredSpots[0].what3words ? `///${filteredSpots[0].what3words}` : "Tap to browse nearby stories"}
+                          {rankedFilteredSpots[0].what3words ? `///${rankedFilteredSpots[0].what3words}` : "Tap to browse nearby stories"}
                         </div>
                       </div>
 
                       <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.8, whiteSpace: "nowrap" }}>
-                        {formatDistance(filteredSpots[0].distance_m)}
+                        {formatDistance(rankedFilteredSpots[0].distance_m)}
                       </div>
                     </div>
 
@@ -1912,7 +1976,7 @@ export default function HomePage() {
                         lineHeight: 1.35,
                       }}
                     >
-                      {filteredSpots[0].description}
+                      {rankedFilteredSpots[0].description}
                     </div>
                   </div>
                 )}
@@ -1933,7 +1997,7 @@ export default function HomePage() {
                     <p style={{ opacity: 0.7 }}>No Spots found with these filters.</p>
                   ) : (
                     <div style={{ display: "grid", gap: 10 }}>
-                      {filteredSpots.map((s) => (
+                      {rankedFilteredSpots.map((s) => (
                         <div
                           key={s.id}
                           role="button"
@@ -2118,7 +2182,7 @@ export default function HomePage() {
                 >
                   {(clusterer) => (
                     <>
-                      {filteredSpots.map((s) => (
+                      {rankedFilteredSpots.map((s) => (
                         <MarkerF
                           key={s.id}
                           clusterer={selected?.id === s.id ? undefined : clusterer}
@@ -2139,7 +2203,7 @@ export default function HomePage() {
                   )}
                 </MarkerClustererF>
               ) : (
-                filteredSpots.map((s) => (
+                rankedFilteredSpots.map((s) => (
                   <MarkerF
                     key={s.id}
                     position={{ lat: s.lat_out, lng: s.lng_out }}
