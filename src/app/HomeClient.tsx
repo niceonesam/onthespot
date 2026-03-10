@@ -354,6 +354,19 @@ export default function HomePage() {
   const mobileSnapOrder: Array<"peek" | "half" | "full"> = ["peek", "half", "full"];
   const shouldClusterMarkers = filteredSpots.length >= (isMobile ? 12 : 20);
   const clusterAnchorText: [number, number] = [0, 0];
+  const clusterCalculator = (markers: unknown[], numStyles: number) => {
+    const count = markers.length;
+    let index = 1;
+
+    if (count >= 100) index = 3;
+    else if (count >= 20) index = 2;
+
+    return {
+      text: String(count),
+      index: Math.min(index, numStyles),
+      title: `${count} spots`,
+    };
+  };
   const clusterStyles = [
     {
       url: clusterBubbleDataUrl("#0F2A44", "#1FB6A6", "#E6B325"),
@@ -699,7 +712,7 @@ export default function HomePage() {
     markerPulseTimeoutRef.current = window.setTimeout(() => {
       setPulsingMarkerId((prev) => (prev === s.id ? null : prev));
       markerPulseTimeoutRef.current = null;
-    }, 260);
+    }, 1100);
 
     if (mapPanTimeoutRef.current != null) {
       window.clearTimeout(mapPanTimeoutRef.current);
@@ -726,14 +739,14 @@ export default function HomePage() {
     isSelected = false,
     isPulsing = false
   ): google.maps.Icon {
-    const size = isPulsing ? 48 : isSelected ? 40 : 28;
+    const size = isSelected || isPulsing ? 42 : 28;
     const anchorX = size / 2;
     const anchorY = size;
 
     const stroke = isPulsing
-      ? "rgba(0,0,0,0.70)"
+      ? "rgba(0,0,0,0.72)"
       : isSelected
-        ? "rgba(0,0,0,0.55)"
+        ? "rgba(0,0,0,0.58)"
         : "rgba(0,0,0,0.35)";
 
     const gold = isSelected || isPulsing ? "#F2C94C" : "#E6B325";
@@ -744,28 +757,52 @@ export default function HomePage() {
       "#1FB6A6";
 
     const outer = "#0F2A44";
-    const goldRadius = isPulsing ? 7.5 : isSelected ? 7 : 6;
+    const ringRadius = isSelected || isPulsing ? 10.7 : 10;
+    const goldRadius = isSelected || isPulsing ? 7.2 : 6;
 
     const pulseTicks = isPulsing
       ? `
-        <line x1="24" y1="4" x2="24" y2="0.8" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
-        <line x1="36.7" y1="9.3" x2="39" y2="7" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
-        <line x1="43" y1="18" x2="46.2" y2="18" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
-        <line x1="36.7" y1="26.7" x2="39" y2="29" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
-        <line x1="11.3" y1="9.3" x2="9" y2="7" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
-        <line x1="5" y1="18" x2="1.8" y2="18" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
-        <line x1="11.3" y1="26.7" x2="9" y2="29" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
+        <g opacity="0.95">
+          <animate attributeName="opacity" values="0.95;0.45;0.95" dur="1.05s" repeatCount="indefinite" />
+          <line x1="24" y1="4" x2="24" y2="0.8" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
+          <line x1="36.7" y1="9.3" x2="39" y2="7" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
+          <line x1="43" y1="18" x2="46.2" y2="18" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
+          <line x1="36.7" y1="26.7" x2="39" y2="29" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
+          <line x1="11.3" y1="9.3" x2="9" y2="7" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
+          <line x1="5" y1="18" x2="1.8" y2="18" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
+          <line x1="11.3" y1="26.7" x2="9" y2="29" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
+        </g>
       `
       : "";
+
+    const halo = isPulsing
+      ? `
+        <circle cx="24" cy="18" r="12.5" fill="${gold}" opacity="0.18">
+          <animate attributeName="r" values="12.5;16.8;12.5" dur="1.05s" repeatCount="indefinite" />
+          <animate attributeName="opacity" values="0.22;0.06;0.22" dur="1.05s" repeatCount="indefinite" />
+        </circle>
+        <circle cx="24" cy="18" r="10.8" fill="none" stroke="${gold}" stroke-width="2.6" opacity="0.82">
+          <animate attributeName="r" values="10.8;14.4;10.8" dur="1.05s" repeatCount="indefinite" />
+          <animate attributeName="opacity" values="0.9;0.24;0.9" dur="1.05s" repeatCount="indefinite" />
+        </circle>
+      `
+      : isSelected
+        ? `
+          <circle cx="24" cy="18" r="14" fill="${gold}" opacity="0.18" />
+          <circle cx="24" cy="18" r="11.5" fill="none" stroke="${gold}" stroke-width="2" opacity="0.75" />
+        `
+        : "";
 
     const svg = `<?xml version="1.0" encoding="UTF-8"?>
     <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 48 48">
       ${pulseTicks}
+      ${halo}
       <path d="M24 46C24 46 6 28 6 18C6 8 14 2 24 2C34 2 42 8 42 18C42 28 24 46 24 46Z"
             fill="${outer}"
             stroke="${stroke}"
             stroke-width="1.2"/>
-      <circle cx="24" cy="18" r="${isPulsing ? 11 : isSelected ? 10.5 : 10}" fill="${ring}" />
+      <circle cx="24" cy="18" r="${ringRadius}" fill="${ring}" />
+      ${isPulsing ? `<circle cx="24" cy="18" r="9.6" fill="none" stroke="${gold}" stroke-width="1.6" opacity="0.7"><animate attributeName="r" values="9.6;12.6;9.6" dur="1.05s" repeatCount="indefinite" /><animate attributeName="opacity" values="0.75;0.18;0.75" dur="1.05s" repeatCount="indefinite" /></circle>` : ""}
       <circle cx="24" cy="18" r="${goldRadius}" fill="${gold}" />
     </svg>`;
 
@@ -2071,12 +2108,13 @@ export default function HomePage() {
               {shouldClusterMarkers ? (
                 <MarkerClustererF
                   options={{
-                    minimumClusterSize: 2,
-                    gridSize: isMobile ? 44 : 56,
-                    maxZoom: 16,
-                    styles: clusterStyles,
-                    clusterClass: "ots-map-cluster",
-                  }}
+                  minimumClusterSize: 2,
+                  gridSize: isMobile ? 44 : 56,
+                  maxZoom: 16,
+                  styles: clusterStyles,
+                  clusterClass: "ots-map-cluster",
+                  calculator: clusterCalculator,
+                }}
                 >
                   {(clusterer) => (
                     <>
