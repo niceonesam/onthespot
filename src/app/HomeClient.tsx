@@ -366,19 +366,19 @@ export default function HomePage() {
     },
     {
       url: clusterBubbleDataUrl("#0F2A44", "#1FB6A6", "#E6B325"),
-      height: 58,
-      width: 58,
+      height: 64,
+      width: 64,
       textColor: "#ffffff",
-      textSize: 17,
+      textSize: 18,
       fontWeight: "800",
       anchorText: clusterAnchorText,
     },
     {
       url: clusterBubbleDataUrl("#0F2A44", "#1FB6A6", "#E6B325"),
-      height: 64,
-      width: 64,
+      height: 78,
+      width: 78,
       textColor: "#ffffff",
-      textSize: 16,
+      textSize: 20,
       fontWeight: "800",
       anchorText: clusterAnchorText,
     },
@@ -721,60 +721,79 @@ export default function HomePage() {
     }
   }
 
-function markerIconForVisibility(
-  v?: string | null,
-  isSelected = false,
-  isPulsing = false
-): google.maps.Icon {
-  const size = isPulsing ? 44 : isSelected ? 36 : 28;
-  const anchorX = size / 2;
-  const anchorY = size;
+  function markerIconForVisibility(
+    v?: string | null,
+    isSelected = false,
+    isPulsing = false
+  ): google.maps.Icon {
+    const size = isPulsing ? 48 : isSelected ? 40 : 28;
+    const anchorX = size / 2;
+    const anchorY = size;
 
-  const stroke = isPulsing
-    ? "rgba(0,0,0,0.70)"
-    : isSelected
-      ? "rgba(0,0,0,0.55)"
-      : "rgba(0,0,0,0.35)";
+    const stroke = isPulsing
+      ? "rgba(0,0,0,0.70)"
+      : isSelected
+        ? "rgba(0,0,0,0.55)"
+        : "rgba(0,0,0,0.35)";
 
-  const gold = isSelected || isPulsing ? "#F2C94C" : "#E6B325";
-  const ring =
-    v === "friends" ? "#2563eb" :
-    v === "group" ? "#7c3aed" :
-    v === "private" ? "#6b7280" :
-    "#1FB6A6";
+    const gold = isSelected || isPulsing ? "#F2C94C" : "#E6B325";
+    const ring =
+      v === "friends" ? "#2563eb" :
+      v === "group" ? "#7c3aed" :
+      v === "private" ? "#6b7280" :
+      "#1FB6A6";
 
-  const outer = "#0F2A44";
-  const goldRadius = isPulsing ? 7 : isSelected ? 6.5 : 6;
+    const outer = "#0F2A44";
+    const goldRadius = isPulsing ? 7.5 : isSelected ? 7 : 6;
 
-  const pulseTicks = isPulsing
-    ? `
-      <line x1="24" y1="4" x2="24" y2="0.8" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
-      <line x1="36.7" y1="9.3" x2="39" y2="7" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
-      <line x1="43" y1="18" x2="46.2" y2="18" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
-      <line x1="36.7" y1="26.7" x2="39" y2="29" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
-      <line x1="11.3" y1="9.3" x2="9" y2="7" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
-      <line x1="5" y1="18" x2="1.8" y2="18" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
-      <line x1="11.3" y1="26.7" x2="9" y2="29" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
-    `
-    : "";
+    const pulseTicks = isPulsing
+      ? `
+        <line x1="24" y1="4" x2="24" y2="0.8" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
+        <line x1="36.7" y1="9.3" x2="39" y2="7" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
+        <line x1="43" y1="18" x2="46.2" y2="18" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
+        <line x1="36.7" y1="26.7" x2="39" y2="29" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
+        <line x1="11.3" y1="9.3" x2="9" y2="7" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
+        <line x1="5" y1="18" x2="1.8" y2="18" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
+        <line x1="11.3" y1="26.7" x2="9" y2="29" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
+      `
+      : "";
 
-  const svg = `<?xml version="1.0" encoding="UTF-8"?>
-  <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 48 48">
-    ${pulseTicks}
-    <path d="M24 46C24 46 6 28 6 18C6 8 14 2 24 2C34 2 42 8 42 18C42 28 24 46 24 46Z"
-          fill="${outer}"
-          stroke="${stroke}"
-          stroke-width="1.2"/>
-    <circle cx="24" cy="18" r="10" fill="${ring}" />
-    <circle cx="24" cy="18" r="${goldRadius}" fill="${gold}" />
-  </svg>`;
+    const svg = `<?xml version="1.0" encoding="UTF-8"?>
+    <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 48 48">
+      ${pulseTicks}
+      <path d="M24 46C24 46 6 28 6 18C6 8 14 2 24 2C34 2 42 8 42 18C42 28 24 46 24 46Z"
+            fill="${outer}"
+            stroke="${stroke}"
+            stroke-width="1.2"/>
+      <circle cx="24" cy="18" r="${isPulsing ? 11 : isSelected ? 10.5 : 10}" fill="${ring}" />
+      <circle cx="24" cy="18" r="${goldRadius}" fill="${gold}" />
+    </svg>`;
 
-  return {
-    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
-    scaledSize: new google.maps.Size(size, size),
-    anchor: new google.maps.Point(anchorX, anchorY),
-  };
-}
+    return {
+      url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+      scaledSize: new google.maps.Size(size, size),
+      anchor: new google.maps.Point(anchorX, anchorY),
+    };
+  }
+
+  function markerIconForUser(): google.maps.Icon {
+    const size = 30;
+    const anchorX = size / 2;
+    const anchorY = size / 2;
+
+    const svg = `<?xml version="1.0" encoding="UTF-8"?>
+    <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 48 48">
+      <circle cx="24" cy="24" r="18" fill="#ffffff" stroke="#0F2A44" stroke-width="2.4" />
+      <circle cx="24" cy="24" r="10" fill="#1FB6A6" />
+      <circle cx="24" cy="24" r="6" fill="#E6B325" />
+    </svg>`;
+
+    return {
+      url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+      scaledSize: new google.maps.Size(size, size),
+      anchor: new google.maps.Point(anchorX, anchorY),
+    };
+  }
 
   async function dismissOnboarding() {
     if (!userId) {
@@ -2047,7 +2066,7 @@ function markerIconForVisibility(
               }}
               onClick={() => setSelected(null)}
             >
-              <MarkerF position={pos} title="You" />
+              <MarkerF position={pos} title="You" icon={markerIconForUser()} zIndex={1100} />
 
               {shouldClusterMarkers ? (
                 <MarkerClustererF
