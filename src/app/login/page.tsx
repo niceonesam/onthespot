@@ -12,6 +12,7 @@ function LoginInner() {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [cardActive, setCardActive] = useState(false);
   const action = useMemo(
     () => (mode === "login" ? "/auth/signin" : "/auth/signup"),
     [mode]
@@ -20,23 +21,44 @@ function LoginInner() {
   return (
     <div
       style={{
+        position: "relative",
         minHeight: "100vh",
         display: "grid",
         placeItems: "center",
         padding: 20,
-        background:
-          "radial-gradient(1200px 600px at 20% 10%, rgba(31,182,166,0.10), transparent 55%), radial-gradient(900px 500px at 80% 30%, rgba(230,179,37,0.12), transparent 55%), linear-gradient(180deg, rgba(15,42,68,0.03), rgba(15,42,68,0.05))",
+        background: "linear-gradient(180deg, #f4f6f7 0%, #eef2f3 100%)",
+        boxShadow: "inset 0 140px 220px rgba(255,255,255,0.26), inset 0 -120px 180px rgba(15,42,68,0.03)",
       }}
     >
       <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          zIndex: 0,
+          backgroundImage: "url(/brand/login-map.jpg)",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          filter: "grayscale(100%) blur(1.6px) brightness(1.02)",
+          opacity: 0.32,
+          transform: "scale(1.05)",
+          pointerEvents: "none",
+        }}
+      />
+      <div
         className="ots-surface ots-surface--shadow"
         style={{
+          position: "relative",
+          zIndex: 1,
           width: "min(480px, 100%)",
           padding: 26,
           borderRadius: 22,
           border: "1px solid rgba(15,42,68,0.08)",
           background: "rgba(255,255,255,0.94)",
-          boxShadow: "0 18px 50px rgba(15,42,68,0.12)",
+          boxShadow: cardActive
+            ? "0 26px 70px rgba(15,42,68,0.18)"
+            : "0 18px 50px rgba(15,42,68,0.12)",
+          transform: cardActive ? "translateY(-2px)" : "translateY(0)",
+          transition: "box-shadow 180ms ease, transform 180ms ease",
         }}
       >
         {/* Brand */}
@@ -70,7 +92,7 @@ function LoginInner() {
             display: "grid",
             gridTemplateColumns: "1fr 1fr",
             gap: 8,
-            background: "rgba(15,42,68,0.04)",
+            background: "linear-gradient(180deg, rgba(15,42,68,0.05), rgba(15,42,68,0.035))",
             padding: 6,
             borderRadius: 16,
             border: "1px solid rgba(15,42,68,0.08)",
@@ -84,9 +106,17 @@ function LoginInner() {
             onClick={() => setMode("login")}
             className="ots-btn"
             style={{
-              border: "1px solid rgba(15,42,68,0.10)",
-              background: mode === "login" ? "white" : "transparent",
-              boxShadow: mode === "login" ? "0 6px 18px rgba(15,42,68,0.10)" : "none",
+              border: mode === "login"
+                ? "1px solid rgba(15,42,68,0.18)"
+                : "1px solid rgba(15,42,68,0.08)",
+              background: mode === "login"
+                ? "linear-gradient(180deg, rgba(255,255,255,1), rgba(246,249,251,1))"
+                : "transparent",
+              boxShadow: mode === "login"
+                ? "0 8px 20px rgba(15,42,68,0.12), inset 0 1px 0 rgba(255,255,255,0.95)"
+                : "none",
+              color: mode === "login" ? "#0F2A44" : "#374151",
+              transform: mode === "login" ? "translateY(-1px)" : "none",
               fontWeight: 800,
             }}
           >
@@ -99,9 +129,17 @@ function LoginInner() {
             onClick={() => setMode("signup")}
             className="ots-btn"
             style={{
-              border: "1px solid rgba(15,42,68,0.10)",
-              background: mode === "signup" ? "white" : "transparent",
-              boxShadow: mode === "signup" ? "0 6px 18px rgba(15,42,68,0.10)" : "none",
+              border: mode === "signup"
+                ? "1px solid rgba(15,42,68,0.18)"
+                : "1px solid rgba(15,42,68,0.08)",
+              background: mode === "signup"
+                ? "linear-gradient(180deg, rgba(255,255,255,1), rgba(246,249,251,1))"
+                : "transparent",
+              boxShadow: mode === "signup"
+                ? "0 8px 20px rgba(15,42,68,0.12), inset 0 1px 0 rgba(255,255,255,0.95)"
+                : "none",
+              color: mode === "signup" ? "#0F2A44" : "#374151",
+              transform: mode === "signup" ? "translateY(-1px)" : "none",
               fontWeight: 800,
             }}
           >
@@ -112,6 +150,12 @@ function LoginInner() {
         <form
           action={action}
           method="post"
+          onFocusCapture={() => setCardActive(true)}
+          onBlurCapture={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+              setCardActive(false);
+            }
+          }}
           onSubmit={() => {
             setSubmitting(true);
           }}
@@ -167,11 +211,11 @@ function LoginInner() {
             disabled={submitting}
             style={{
               borderColor: "rgba(15,42,68,0.14)",
-              background: "linear-gradient(180deg, rgba(31,182,166,0.20), rgba(31,182,166,0.10))",
+              background: "linear-gradient(180deg, rgba(31,182,166,0.24), rgba(31,182,166,0.12))",
               color: "#0F2A44",
               fontWeight: 800,
               minHeight: 52,
-              boxShadow: "0 10px 24px rgba(31,182,166,0.14)",
+              boxShadow: "0 12px 28px rgba(31,182,166,0.16), inset 0 1px 0 rgba(255,255,255,0.55)",
             }}
           >
             {submitting ? "Working…" : mode === "login" ? "Continue" : "Create account"}
@@ -232,15 +276,39 @@ function LoginFallback() {
   return (
     <div
       style={{
+        position: "relative",
         minHeight: "100vh",
         display: "grid",
         placeItems: "center",
         padding: 20,
-        background:
-          "radial-gradient(1200px 600px at 20% 10%, rgba(31,182,166,0.10), transparent 55%), radial-gradient(900px 500px at 80% 30%, rgba(230,179,37,0.12), transparent 55%), linear-gradient(180deg, rgba(15,42,68,0.03), rgba(15,42,68,0.05))",
+        background: "linear-gradient(180deg, #f4f6f7 0%, #eef2f3 100%)",
+        boxShadow: "inset 0 140px 220px rgba(255,255,255,0.26), inset 0 -120px 180px rgba(15,42,68,0.03)",
       }}
     >
-      <div className="ots-surface ots-surface--shadow" style={{ width: "min(480px, 100%)", padding: 26, borderRadius: 22, border: "1px solid rgba(15,42,68,0.08)", background: "rgba(255,255,255,0.94)", boxShadow: "0 18px 50px rgba(15,42,68,0.12)" }}>
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          zIndex: 0,
+          backgroundImage: "url(/brand/login-map.jpg)",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          filter: "grayscale(100%) blur(1.6px) brightness(1.02)",
+          opacity: 0.32,
+          transform: "scale(1.05)",
+          pointerEvents: "none",
+        }}
+      />
+      <div className="ots-surface ots-surface--shadow" style={{
+        position: "relative",
+        zIndex: 1,
+        width: "min(480px, 100%)",
+        padding: 26,
+        borderRadius: 22,
+        border: "1px solid rgba(15,42,68,0.08)",
+        background: "rgba(255,255,255,0.94)",
+        boxShadow: "0 18px 50px rgba(15,42,68,0.12)",
+      }}>
         <div style={{ display: "grid", gap: 12, marginBottom: 18 }}>
           <div style={{ height: 40, width: 220, borderRadius: 10, background: "#e5e7eb" }} />
           <div style={{ height: 14, width: "86%", borderRadius: 10, background: "#eef2f7" }} />
