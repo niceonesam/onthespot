@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630">
+  <rect width="1200" height="630" fill="#0F2A44"/>
+
+  <circle cx="600" cy="280" r="120" fill="#1FB6A6"/>
+  <circle cx="600" cy="280" r="70" fill="#E6B325"/>
+
+  <text x="600" y="480"
+        text-anchor="middle"
+        font-size="64"
+        font-family="Palatino, serif"
+        fill="white"
+        font-weight="700">
+        OnTheSpot
+  </text>
+
+  <text x="600" y="540"
+        text-anchor="middle"
+        font-size="28"
+        font-family="Palatino, serif"
+        fill="white"
+        opacity="0.85">
+        Nearby stories on the map
+  </text>
+</svg>

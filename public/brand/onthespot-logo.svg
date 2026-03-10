@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 80">
+  <!-- icon -->
+  <g transform="translate(0,8) scale(1)">
+    <path d="M32 62C32 62 8 36 8 22C8 10 18 2 32 2C46 2 56 10 56 22C56 36 32 62 32 62Z"
+          fill="#0F2A44"/>
+    <circle cx="32" cy="22" r="12" fill="#1FB6A6"/>
+    <circle cx="32" cy="22" r="7" fill="#E6B325"/>
+  </g>
+
+  <!-- text -->
+  <text x="80" y="46"
+        font-family="Palatino, 'Palatino Linotype', serif"
+        font-size="36"
+        fill="#0F2A44"
+        font-weight="700">
+        OnTheSpot
+  </text>
+</svg>

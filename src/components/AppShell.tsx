@@ -10,7 +10,6 @@ export default function AppShell(props: {
   fullBleed?: boolean;
   children: ReactNode;
 }) {
-  const title = props.title ?? "OnTheSpot";
 
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
@@ -32,32 +31,24 @@ export default function AppShell(props: {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 8,
+              gap: 10,
               textDecoration: "none",
-              color: "#00fffb",
+              color: "#0F2A44",
               minWidth: 0,
             }}
             aria-label="OnTheSpot home"
           >
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-              style={{ display: "block" }}
-            >
-              <path
-                d="M12 22s7-4.35 7-11a7 7 0 1 0-14 0c0 6.65 7 11 7 11z"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              />
-              
-              <circle cx="12" cy="11" r="2.5" fill="#ffb700" />
-            </svg>
-            <strong style={{ fontSize: 18, color: "#111", whiteSpace: "nowrap" }}>
-              {title}
-            </strong>
+            <img
+              src="/brand/onthespot-logo.svg"
+              alt="OnTheSpot logo"
+              style={{
+                display: "block",
+                height: 36,
+                width: "auto",
+                maxWidth: "min(60vw, 240px)",
+                objectFit: "contain",
+              }}
+            />
           </Link>
 
           {props.subtitle ? (
