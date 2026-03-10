@@ -169,19 +169,19 @@ function clamp<T extends number>(value: T, min: number, max: number) {
   return Math.max(min, Math.min(max, value)) as T;
 }
 
-function clusterBubbleDataUrl(fill: string, stroke: string) {
+function clusterBubbleDataUrl(outer: string, ring: string, core: string) {
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
       <defs>
         <radialGradient id="clusterGlow" cx="35%" cy="30%" r="75%">
           <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95" />
-          <stop offset="18%" stop-color="#7ff7eb" />
-          <stop offset="68%" stop-color="${fill}" />
-          <stop offset="100%" stop-color="${stroke}" />
+          <stop offset="20%" stop-color="${core}" stop-opacity="0.98" />
+          <stop offset="42%" stop-color="${ring}" stop-opacity="0.96" />
+          <stop offset="100%" stop-color="${outer}" stop-opacity="1" />
         </radialGradient>
       </defs>
-      <circle cx="32" cy="32" r="26" fill="url(#clusterGlow)" stroke="rgba(0,0,0,0.22)" stroke-width="2" />
-      <circle cx="32" cy="32" r="18" fill="rgba(255,255,255,0.16)" />
+      <circle cx="32" cy="32" r="26" fill="url(#clusterGlow)" stroke="rgba(0,0,0,0.18)" stroke-width="2" />
+      <circle cx="32" cy="32" r="18" fill="rgba(255,255,255,0.10)" />
     </svg>
   `;
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
@@ -240,6 +240,7 @@ export default function HomePage() {
   const [checkingOnboarding, setCheckingOnboarding] = useState(false);
   const [savingOnboarding, setSavingOnboarding] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState(0);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -355,28 +356,28 @@ export default function HomePage() {
   const clusterAnchorText: [number, number] = [0, 0];
   const clusterStyles = [
     {
-      url: clusterBubbleDataUrl("#00dbc1", "#00bfa9"),
+      url: clusterBubbleDataUrl("#0F2A44", "#1FB6A6", "#E6B325"),
       height: 52,
       width: 52,
-      textColor: "#111111",
+      textColor: "#ffffff",
       textSize: 17,
       fontWeight: "800",
       anchorText: clusterAnchorText,
     },
     {
-      url: clusterBubbleDataUrl("#00dbc1", "#00bfa9"),
+      url: clusterBubbleDataUrl("#0F2A44", "#1FB6A6", "#E6B325"),
       height: 58,
       width: 58,
-      textColor: "#111111",
+      textColor: "#ffffff",
       textSize: 17,
       fontWeight: "800",
       anchorText: clusterAnchorText,
     },
     {
-      url: clusterBubbleDataUrl("#00dbc1", "#00bfa9"),
+      url: clusterBubbleDataUrl("#0F2A44", "#1FB6A6", "#E6B325"),
       height: 64,
       width: 64,
-      textColor: "#111111",
+      textColor: "#ffffff",
       textSize: 16,
       fontWeight: "800",
       anchorText: clusterAnchorText,
@@ -720,39 +721,60 @@ export default function HomePage() {
     }
   }
 
-  function markerIconForVisibility(
-    v?: string | null,
-    isSelected = false,
-    isPulsing = false
-  ): google.maps.Icon {
-    const color =
-      v === "friends" ? "#2563eb" :
-      v === "group" ? "#7c3aed" :
-      v === "private" ? "#6b7280" :
-      "#00dbc1"; // public
+function markerIconForVisibility(
+  v?: string | null,
+  isSelected = false,
+  isPulsing = false
+): google.maps.Icon {
+  const size = isPulsing ? 44 : isSelected ? 36 : 28;
+  const anchorX = size / 2;
+  const anchorY = size;
 
-    const size = isPulsing ? 44 : isSelected ? 36 : 28;
-    const anchorX = size / 2;
-    const anchorY = size;
-    const innerR = isPulsing ? 3.8 : isSelected ? 3.2 : 2.6;
-    const stroke = isPulsing
-      ? "rgba(0,0,0,0.70)"
-      : isSelected
-        ? "rgba(0,0,0,0.55)"
-        : "rgba(0,0,0,0.35)";
+  const stroke = isPulsing
+    ? "rgba(0,0,0,0.70)"
+    : isSelected
+      ? "rgba(0,0,0,0.55)"
+      : "rgba(0,0,0,0.35)";
 
-    const svg = `<?xml version="1.0" encoding="UTF-8"?>
-  <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24">
-    <path d="M12 22s7-4.35 7-11a7 7 0 1 0-14 0c0 6.65 7 11 7 11z" fill="${color}" stroke="${stroke}" stroke-width="1.2"/>
-    <circle cx="12" cy="11" r="${innerR}" fill="white" fill-opacity="0.95"/>
+  const gold = isSelected || isPulsing ? "#F2C94C" : "#E6B325";
+  const ring =
+    v === "friends" ? "#2563eb" :
+    v === "group" ? "#7c3aed" :
+    v === "private" ? "#6b7280" :
+    "#1FB6A6";
+
+  const outer = "#0F2A44";
+  const goldRadius = isPulsing ? 7 : isSelected ? 6.5 : 6;
+
+  const pulseTicks = isPulsing
+    ? `
+      <line x1="24" y1="4" x2="24" y2="0.8" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
+      <line x1="36.7" y1="9.3" x2="39" y2="7" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
+      <line x1="43" y1="18" x2="46.2" y2="18" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
+      <line x1="36.7" y1="26.7" x2="39" y2="29" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
+      <line x1="11.3" y1="9.3" x2="9" y2="7" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
+      <line x1="5" y1="18" x2="1.8" y2="18" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
+      <line x1="11.3" y1="26.7" x2="9" y2="29" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
+    `
+    : "";
+
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+  <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 48 48">
+    ${pulseTicks}
+    <path d="M24 46C24 46 6 28 6 18C6 8 14 2 24 2C34 2 42 8 42 18C42 28 24 46 24 46Z"
+          fill="${outer}"
+          stroke="${stroke}"
+          stroke-width="1.2"/>
+    <circle cx="24" cy="18" r="10" fill="${ring}" />
+    <circle cx="24" cy="18" r="${goldRadius}" fill="${gold}" />
   </svg>`;
 
-    return {
-      url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
-      scaledSize: new google.maps.Size(size, size),
-      anchor: new google.maps.Point(anchorX, anchorY),
-    };
-  }
+  return {
+    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+    scaledSize: new google.maps.Size(size, size),
+    anchor: new google.maps.Point(anchorX, anchorY),
+  };
+}
 
   async function dismissOnboarding() {
     if (!userId) {
