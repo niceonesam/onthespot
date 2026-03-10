@@ -11,6 +11,10 @@ type UserRow = {
   created_at: string;
   role: "user" | "super" | "admin";
   credit_balance: number;
+  approved_count: number;
+  rejected_count: number;
+  sourced_count: number;
+  trust_tier: "new" | "trusted" | "verified" | string;
 };
 
 type LedgerRow = {
@@ -28,6 +32,48 @@ function fmtDate(iso: string) {
   } catch {
     return iso;
   }
+}
+
+function prettyTrustTier(tier: string | null | undefined) {
+  if (tier === "verified") return "Verified contributor";
+  if (tier === "trusted") return "Trusted contributor";
+  return "New contributor";
+}
+
+function trustTierStyle(tier: string | null | undefined) {
+  if (tier === "verified") {
+    return {
+      background: "rgba(230, 179, 37, 0.14)",
+      border: "1px solid rgba(230, 179, 37, 0.38)",
+      color: "#0F2A44",
+    };
+  }
+
+  if (tier === "trusted") {
+    return {
+      background: "rgba(31, 182, 166, 0.12)",
+      border: "1px solid rgba(31, 182, 166, 0.34)",
+      color: "#0F2A44",
+    };
+  }
+
+  return {
+    background: "rgba(107, 114, 128, 0.10)",
+    border: "1px solid rgba(107, 114, 128, 0.24)",
+    color: "#374151",
+  };
+}
+
+function rejectionRate(approved: number, rejected: number) {
+  const totalReviewed = approved + rejected;
+  if (totalReviewed <= 0) return 0;
+  return rejected / totalReviewed;
+}
+
+function contributorRisk(approved: number, rejected: number) {
+  const rate = rejectionRate(approved, rejected);
+  if (rejected >= 5 || rate > 0.5) return "warning";
+  return null;
 }
 
 export default function AdminUsersPage() {
@@ -263,7 +309,10 @@ export default function AdminUsersPage() {
         )}
 
         <div style={{ display: "grid", gap: 10 }}>
-          {rows.map((u) => (
+          {rows.map((u) => {
+  const risk = contributorRisk(u.approved_count ?? 0, u.rejected_count ?? 0);
+  const rate = rejectionRate(u.approved_count ?? 0, u.rejected_count ?? 0);
+  return (
             <div
               key={u.id}
               className="ots-surface ots-surface--border"
@@ -285,6 +334,55 @@ export default function AdminUsersPage() {
                 </div>
                 <div style={{ fontSize: 13, color: "#555", marginTop: 2 }}>
                   Created: {fmtDate(u.created_at)} · Current role: <strong>{u.role}</strong>
+                </div>
+
+                <div
+                  style={{
+                    marginTop: 8,
+                    display: "flex",
+                    gap: 8,
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                  }}
+                >
+                  <span
+                    style={{
+                      padding: "4px 8px",
+                      borderRadius: 999,
+                      fontSize: 12,
+                      fontWeight: 800,
+                      ...trustTierStyle(u.trust_tier),
+                    }}
+                  >
+                    {prettyTrustTier(u.trust_tier)}
+                  </span>
+
+                  {risk === "warning" && (
+                    <span
+                      title={`Rejection rate ${Math.round(rate * 100)}%`}
+                      style={{
+                        padding: "4px 8px",
+                        borderRadius: 999,
+                        fontSize: 12,
+                        fontWeight: 800,
+                        background: "rgba(220, 38, 38, 0.10)",
+                        border: "1px solid rgba(220, 38, 38, 0.28)",
+                        color: "#991b1b",
+                      }}
+                    >
+                      Warning · {Math.round(rate * 100)}% rejected
+                    </span>
+                  )}
+
+                  <span style={{ fontSize: 12, color: "#555" }}>
+                    {u.approved_count ?? 0} approved
+                  </span>
+                  <span style={{ fontSize: 12, color: "#555" }}>
+                    {u.rejected_count ?? 0} rejected
+                  </span>
+                  <span style={{ fontSize: 12, color: "#555" }}>
+                    {u.sourced_count ?? 0} sourced
+                  </span>
                 </div>
               </div>
 
@@ -343,7 +441,7 @@ export default function AdminUsersPage() {
                 </select>
               </div>
             </div>
-          ))}
+          )})}
 
           {!loading && rows.length === 0 && (
             <div className="ots-story-text" style={{ padding: 16, color: "#555", fontSize: 14 }}>No users found.</div>

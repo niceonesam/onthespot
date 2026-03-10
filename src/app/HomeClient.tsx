@@ -65,6 +65,13 @@ function formatDistance(meters: number) {
   return `${(meters / 1000).toFixed(1)} km`;
 }
 
+function splitStory(description: string) {
+  const parts = description.trim().split(/(?<=[.!?])\s+/);
+  const intro = parts.slice(0, 2).join(" ").trim();
+  const rest = parts.slice(2).join(" ").trim();
+  return { intro, rest };
+}
+
 function VisibilityBadge(props: { visibility: Spot["visibility"] }) {
   const v = props.visibility;
   if (v === "public") return null;
@@ -392,6 +399,8 @@ export default function HomePage() {
     if (scoreDiff !== 0) return scoreDiff;
     return Number(a.distance_m ?? 999999) - Number(b.distance_m ?? 999999);
   });
+
+  const selectedStoryParts = selected ? splitStory(selected.description) : null;
 
   const availableTags = Array.from(
     new Set(
@@ -2372,25 +2381,64 @@ export default function HomePage() {
                   />
                 )}
 
-                {!selectedSheetIsPeek && selected.date_start && (
-                  <p style={{ opacity: 0.7, marginTop: 8 }}>{selected.date_start}</p>
-                )}
-
                 {!selectedSheetIsPeek && (
-                  <p className="ots-story-text" style={{ marginTop: 10 }}>
-                    {selectedSheetIsHalf && selected.description.length > 180
-                      ? selected.description.slice(0, 180) + "…"
-                      : selected.description}
-                  </p>
-                )}
-
-                {selectedSheetIsFull && (
                   <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
-                    {selected.source_url && (
-                      <div style={{ fontSize: 14, color: "#444" }}>
-                        Source available for this spot.
-                      </div>
+                    <div
+                      className="ots-brand-heading"
+                      style={{ fontSize: 12, opacity: 0.68, letterSpacing: "0.02em" }}
+                    >
+                      Story
+                    </div>
+
+                    <p
+                      className="ots-story-text"
+                      style={{ marginTop: 0, fontSize: 16, lineHeight: 1.6 }}
+                    >
+                      {selectedSheetIsHalf && selectedStoryParts?.intro && selectedStoryParts.intro.length > 220
+                        ? selectedStoryParts.intro.slice(0, 220) + "…"
+                        : selectedStoryParts?.intro ?? ""}
+                    </p>
+
+                    {selectedSheetIsFull && selectedStoryParts?.rest && (
+                      <p
+                        className="ots-story-text"
+                        style={{ marginTop: 0, opacity: 0.94, lineHeight: 1.7 }}
+                      >
+                        {selectedStoryParts.rest}
+                      </p>
                     )}
+
+                    <div
+                      className="ots-surface ots-surface--border"
+                      style={{
+                        padding: 10,
+                        display: "flex",
+                        gap: 10,
+                        flexWrap: "wrap",
+                        alignItems: "center",
+                      }}
+                    >
+                      {selected.date_start && (
+                        <span style={{ fontSize: 13, color: "#444", fontWeight: 700 }}>
+                          {selected.date_start}
+                        </span>
+                      )}
+
+                      {selected.source_url && (
+                        <a
+                          href={selected.source_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 700,
+                            textDecoration: "none",
+                          }}
+                        >
+                          View source
+                        </a>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
