@@ -26,12 +26,24 @@ type LedgerRow = {
   stripe_payment_intent_id: string | null;
 };
 
+type RejectionNoteRow = {
+  id: string;
+  title: string | null;
+  admin_note: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+};
+
 function fmtDate(iso: string) {
   try {
     return new Date(iso).toLocaleString();
   } catch {
     return iso;
   }
+}
+
+function shortId(id: string) {
+  return id.length > 14 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id;
 }
 
 function prettyTrustTier(tier: string | null | undefined) {
@@ -86,6 +98,7 @@ export default function AdminUsersPage() {
   const [auditOpen, setAuditOpen] = useState(false);
   const [auditUser, setAuditUser] = useState<UserRow | null>(null);
   const [auditRows, setAuditRows] = useState<LedgerRow[]>([]);
+  const [rejectionRows, setRejectionRows] = useState<RejectionNoteRow[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
 
   async function load(query?: string) {
@@ -185,28 +198,45 @@ export default function AdminUsersPage() {
     setMsg(null);
     setAuditUser(u);
     setAuditRows([]);
+    setRejectionRows([]);
     setAuditOpen(true);
     setAuditLoading(true);
 
-    const { data, error } = await supabase.rpc("admin_get_user_ledger", {
-      p_user_id: u.id,
-      p_limit: 10,
-    });
+    const [ledgerRes, rejectionRes] = await Promise.all([
+      supabase.rpc("admin_get_user_ledger", {
+        p_user_id: u.id,
+        p_limit: 10,
+      }),
+      supabase
+        .from("spot_submissions")
+        .select("id,title,admin_note,reviewed_at,created_at")
+        .eq("user_id", u.id)
+        .eq("status", "rejected")
+        .not("admin_note", "is", null)
+        .order("reviewed_at", { ascending: false })
+        .limit(5),
+    ]);
 
     setAuditLoading(false);
 
-    if (error) {
-      setMsg(error.message);
+    if (ledgerRes.error) {
+      setMsg(ledgerRes.error.message);
       return;
     }
 
-    setAuditRows((data ?? []) as LedgerRow[]);
+    if (rejectionRes.error) {
+      setMsg((prev) => prev ?? rejectionRes.error.message);
+    }
+
+    setAuditRows((ledgerRes.data ?? []) as LedgerRow[]);
+    setRejectionRows((rejectionRes.data ?? []) as RejectionNoteRow[]);
   }
 
   function closeAudit() {
     setAuditOpen(false);
     setAuditUser(null);
     setAuditRows([]);
+    setRejectionRows([]);
   }
 
   return (
@@ -308,143 +338,215 @@ export default function AdminUsersPage() {
           </div>
         )}
 
-        <div style={{ display: "grid", gap: 10 }}>
+        <div style={{ display: "grid", gap: 14 }}>
           {rows.map((u) => {
-  const risk = contributorRisk(u.approved_count ?? 0, u.rejected_count ?? 0);
-  const rate = rejectionRate(u.approved_count ?? 0, u.rejected_count ?? 0);
-  return (
-            <div
-              key={u.id}
-              className="ots-surface ots-surface--border"
-              style={{
-                padding: 12,
-                background: "white",
-                display: "flex",
-                justifyContent: "space-between",
-                gap: 12,
-                alignItems: "center",
-              }}
-            >
-              <div style={{ minWidth: 0 }}>
-                <div className="ots-brand-heading" style={{ fontWeight: 700, fontSize: 15, color: "#111" }}>
-                  {u.email ?? "(no email)"}{" "}
-                  <span style={{ fontWeight: 400, color: "#666" }}>
-                    · {u.id.slice(0, 8)}…
-                  </span>
-                </div>
-                <div style={{ fontSize: 13, color: "#555", marginTop: 2 }}>
-                  Created: {fmtDate(u.created_at)} · Current role: <strong>{u.role}</strong>
+            const risk = contributorRisk(u.approved_count ?? 0, u.rejected_count ?? 0);
+            const rate = rejectionRate(u.approved_count ?? 0, u.rejected_count ?? 0);
+
+            return (
+              <div
+                key={u.id}
+                className="ots-surface ots-surface--border"
+                style={{
+                  padding: 16,
+                  background: "white",
+                  display: "grid",
+                  gap: 14,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 16,
+                    alignItems: "start",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div style={{ minWidth: 0, flex: "1 1 360px", display: "grid", gap: 8 }}>
+                    <div
+                      className="ots-brand-heading"
+                      style={{ fontWeight: 700, fontSize: 18, color: "#111" }}
+                    >
+                      {u.email ?? "(no email)"}
+                    </div>
+
+                    <div
+                      className="ots-story-text"
+                      style={{ fontSize: 13, color: "#666", lineHeight: 1.5 }}
+                    >
+                      ID: <code>{shortId(u.id)}</code> · Joined {fmtDate(u.created_at)} · Current role{" "}
+                      <strong>{u.role}</strong>
+                    </div>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 8,
+                        flexWrap: "wrap",
+                        alignItems: "center",
+                      }}
+                    >
+                      <span
+                        style={{
+                          padding: "5px 9px",
+                          borderRadius: 999,
+                          fontSize: 12,
+                          fontWeight: 800,
+                          ...trustTierStyle(u.trust_tier),
+                        }}
+                      >
+                        {prettyTrustTier(u.trust_tier)}
+                      </span>
+
+                      {risk === "warning" && (
+                        <span
+                          title={`Rejection rate ${Math.round(rate * 100)}%`}
+                          style={{
+                            padding: "5px 9px",
+                            borderRadius: 999,
+                            fontSize: 12,
+                            fontWeight: 800,
+                            background: "rgba(220, 38, 38, 0.10)",
+                            border: "1px solid rgba(220, 38, 38, 0.28)",
+                            color: "#991b1b",
+                          }}
+                        >
+                          Warning · {Math.round(rate * 100)}% rejected
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div
+                    className="ots-surface ots-surface--border"
+                    style={{
+                      padding: 12,
+                      minWidth: 220,
+                      display: "grid",
+                      gap: 10,
+                    }}
+                  >
+                    <div
+                      className="ots-brand-heading"
+                      style={{ fontSize: 12, opacity: 0.68, letterSpacing: "0.02em" }}
+                    >
+                      Contributor snapshot
+                    </div>
+
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                        gap: 10,
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: 12, color: "#666" }}>Approved</div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: "#111" }}>
+                          {u.approved_count ?? 0}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div style={{ fontSize: 12, color: "#666" }}>Rejected</div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: "#111" }}>
+                          {u.rejected_count ?? 0}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div style={{ fontSize: 12, color: "#666" }}>Sourced</div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: "#111" }}>
+                          {u.sourced_count ?? 0}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div style={{ fontSize: 12, color: "#666" }}>Credits</div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: "#111" }}>
+                          {u.credit_balance ?? 0}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div
                   style={{
-                    marginTop: 8,
                     display: "flex",
-                    gap: 8,
+                    gap: 10,
                     flexWrap: "wrap",
                     alignItems: "center",
+                    justifyContent: "space-between",
                   }}
                 >
-                  <span
-                    style={{
-                      padding: "4px 8px",
-                      borderRadius: 999,
-                      fontSize: 12,
-                      fontWeight: 800,
-                      ...trustTierStyle(u.trust_tier),
-                    }}
-                  >
-                    {prettyTrustTier(u.trust_tier)}
-                  </span>
+                  <div className="ots-story-text" style={{ fontSize: 13, color: "#666" }}>
+                    Use the actions below to adjust credits, inspect ledger history, or change role.
+                  </div>
 
-                  {risk === "warning" && (
-                    <span
-                      title={`Rejection rate ${Math.round(rate * 100)}%`}
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      onClick={() => adjustCredits(u.id)}
                       style={{
-                        padding: "4px 8px",
-                        borderRadius: 999,
-                        fontSize: 12,
-                        fontWeight: 800,
-                        background: "rgba(220, 38, 38, 0.10)",
-                        border: "1px solid rgba(220, 38, 38, 0.28)",
-                        color: "#991b1b",
+                        padding: "8px 12px",
+                        borderRadius: 12,
+                        border: "1px solid #ddd",
+                        background: "white",
+                        cursor: "pointer",
+                        color: "#111",
+                        fontWeight: 700,
                       }}
+                      title="Grant or remove credits"
                     >
-                      Warning · {Math.round(rate * 100)}% rejected
-                    </span>
-                  )}
+                      Adjust credits
+                    </button>
 
-                  <span style={{ fontSize: 12, color: "#555" }}>
-                    {u.approved_count ?? 0} approved
-                  </span>
-                  <span style={{ fontSize: 12, color: "#555" }}>
-                    {u.rejected_count ?? 0} rejected
-                  </span>
-                  <span style={{ fontSize: 12, color: "#555" }}>
-                    {u.sourced_count ?? 0} sourced
-                  </span>
+                    <button
+                      type="button"
+                      onClick={() => openAudit(u)}
+                      style={{
+                        padding: "8px 12px",
+                        borderRadius: 12,
+                        border: "1px solid #ddd",
+                        background: "white",
+                        cursor: "pointer",
+                        color: "#111",
+                        fontWeight: 700,
+                      }}
+                      title="View ledger + moderation notes"
+                    >
+                      View history
+                    </button>
+
+                    <select
+                      defaultValue={u.role}
+                      onChange={(e) => setRole(u.id, e.target.value as UserRow["role"])}
+                      style={{
+                        padding: 8,
+                        borderRadius: 12,
+                        border: "1px solid #ddd",
+                        background: "white",
+                        color: "#111",
+                        fontWeight: 700,
+                      }}
+                      title="Change role"
+                    >
+                      <option value="user">user</option>
+                      <option value="super">super</option>
+                      <option value="admin">admin</option>
+                    </select>
+                  </div>
                 </div>
               </div>
-
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <div style={{ fontSize: 13, color: "#555" }}>
-                  Credits: <strong style={{ color: "#111" }}>{u.credit_balance ?? 0}</strong>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => adjustCredits(u.id)}
-                  style={{
-                    padding: "8px 10px",
-                    borderRadius: 12,
-                    border: "1px solid #ddd",
-                    background: "white",
-                    cursor: "pointer",
-                    color: "#111",
-                  }}
-                  title="Grant or remove credits"
-                >
-                  Credits…
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => openAudit(u)}
-                  style={{
-                    padding: "8px 10px",
-                    borderRadius: 12,
-                    border: "1px solid #ddd",
-                    background: "white",
-                    cursor: "pointer",
-                    color: "#111",
-                  }}
-                  title="View last 10 credit ledger entries"
-                >
-                  Audit…
-                </button>
-
-                <select
-                  defaultValue={u.role}
-                  onChange={(e) => setRole(u.id, e.target.value as UserRow["role"])}
-                  style={{
-                    padding: 8,
-                    borderRadius: 12,
-                    border: "1px solid #ddd",
-                    background: "white",
-                    color: "#111",
-                  }}
-                  title="Change role"
-                >
-                  <option value="user">user</option>
-                  <option value="super">super</option>
-                  <option value="admin">admin</option>
-                </select>
-              </div>
-            </div>
-          )})}
+            );
+          })}
 
           {!loading && rows.length === 0 && (
-            <div className="ots-story-text" style={{ padding: 16, color: "#555", fontSize: 14 }}>No users found.</div>
+            <div className="ots-story-text" style={{ padding: 16, color: "#555", fontSize: 14 }}>
+              No users found.
+            </div>
           )}
         </div>
 
@@ -488,7 +590,7 @@ export default function AdminUsersPage() {
               >
                 <div style={{ minWidth: 0 }}>
                   <div className="ots-brand-heading" style={{ fontWeight: 800, fontSize: 16, color: "#111" }}>
-                    Credit Ledger (last 10)
+                    User history
                   </div>
                   {auditUser && (
                     <div style={{ fontSize: 13, color: "#666", marginTop: 2 }}>
@@ -526,49 +628,110 @@ export default function AdminUsersPage() {
                   </div>
                 )}
 
-                {!auditLoading && auditRows.length > 0 && (
-                  <div style={{ display: "grid", gap: 8 }}>
-                    {auditRows.map((r) => (
+                {!auditLoading && (
+                  <div style={{ display: "grid", gap: 14 }}>
+                    <div>
                       <div
-                        key={r.id}
-                        className="ots-surface ots-surface--border"
-                        style={{ padding: 10, display: "grid", gap: 4 }}
+                        className="ots-brand-heading"
+                        style={{ fontWeight: 800, fontSize: 14, color: "#111", marginBottom: 8 }}
                       >
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            gap: 12,
-                          }}
-                        >
-                          <div className="ots-brand-heading" style={{ fontWeight: 700, color: "#111" }}>
-                            {r.delta > 0 ? `+${r.delta}` : `${r.delta}`} · {r.reason}
-                          </div>
-                          <div style={{ fontSize: 12, color: "#666" }}>
-                            {fmtDate(r.created_at)}
-                          </div>
-                        </div>
-
-                        <div
-                          style={{
-                            fontSize: 12,
-                            color: "#666",
-                            wordBreak: "break-word",
-                          }}
-                        >
-                          {r.submission_id && (
-                            <div>
-                              submission_id: <code>{r.submission_id}</code>
-                            </div>
-                          )}
-                          {r.stripe_payment_intent_id && (
-                            <div>
-                              payment_intent: <code>{r.stripe_payment_intent_id}</code>
-                            </div>
-                          )}
-                        </div>
+                        Credit ledger (last 10)
                       </div>
-                    ))}
+
+                      {auditRows.length === 0 ? (
+                        <div style={{ fontSize: 14, color: "#555" }}>No ledger entries found.</div>
+                      ) : (
+                        <div style={{ display: "grid", gap: 8 }}>
+                          {auditRows.map((r) => (
+                            <div
+                              key={r.id}
+                              className="ots-surface ots-surface--border"
+                              style={{ padding: 10, display: "grid", gap: 4 }}
+                            >
+                              <div
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  gap: 12,
+                                }}
+                              >
+                                <div className="ots-brand-heading" style={{ fontWeight: 700, color: "#111" }}>
+                                  {r.delta > 0 ? `+${r.delta}` : `${r.delta}`} · {r.reason}
+                                </div>
+                                <div style={{ fontSize: 12, color: "#666" }}>
+                                  {fmtDate(r.created_at)}
+                                </div>
+                              </div>
+
+                              <div
+                                style={{
+                                  fontSize: 12,
+                                  color: "#666",
+                                  wordBreak: "break-word",
+                                }}
+                              >
+                                {r.submission_id && (
+                                  <div>
+                                    submission_id: <code>{r.submission_id}</code>
+                                  </div>
+                                )}
+                                {r.stripe_payment_intent_id && (
+                                  <div>
+                                    payment_intent: <code>{r.stripe_payment_intent_id}</code>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <div
+                        className="ots-brand-heading"
+                        style={{ fontWeight: 800, fontSize: 14, color: "#111", marginBottom: 8 }}
+                      >
+                        Recent rejection notes
+                      </div>
+
+                      {rejectionRows.length === 0 ? (
+                        <div style={{ fontSize: 14, color: "#555" }}>No rejection notes found.</div>
+                      ) : (
+                        <div style={{ display: "grid", gap: 8 }}>
+                          {rejectionRows.map((r) => (
+                            <div
+                              key={r.id}
+                              className="ots-surface ots-surface--border"
+                              style={{ padding: 10, display: "grid", gap: 6 }}
+                            >
+                              <div
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  gap: 12,
+                                  alignItems: "start",
+                                }}
+                              >
+                                <div className="ots-brand-heading" style={{ fontWeight: 700, color: "#111" }}>
+                                  {r.title || "Untitled submission"}
+                                </div>
+                                <div style={{ fontSize: 12, color: "#666", whiteSpace: "nowrap" }}>
+                                  {fmtDate(r.reviewed_at ?? r.created_at)}
+                                </div>
+                              </div>
+
+                              <div
+                                className="ots-story-text"
+                                style={{ fontSize: 14, color: "#333", lineHeight: 1.55 }}
+                              >
+                                {r.admin_note}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

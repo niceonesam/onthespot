@@ -109,6 +109,59 @@ function sortSubmissionsByTrust(
   });
 }
 
+function submissionRichnessScore(s: Submission) {
+  const descriptionLength = s.description?.trim().length ?? 0;
+
+  let score = 0;
+  if (descriptionLength >= 220) score += 4;
+  else if (descriptionLength >= 120) score += 3;
+  else if (descriptionLength >= 60) score += 2;
+  else if (descriptionLength > 0) score += 1;
+
+  if (s.source_url) score += 3;
+  if (s.photo_url) score += 2;
+  if (s.what3words) score += 1;
+  if (s.category) score += 1;
+  if (typeof s.confidence === "number") score += Math.min(Math.max(s.confidence, 1), 5) >= 4 ? 2 : 1;
+
+  return score;
+}
+
+function submissionRichnessMeta(s: Submission) {
+  const score = submissionRichnessScore(s);
+
+  if (score >= 10) {
+    return {
+      label: "Rich submission",
+      tone: {
+        background: "rgba(31, 182, 166, 0.12)",
+        border: "1px solid rgba(31, 182, 166, 0.34)",
+        color: "#0F2A44",
+      },
+    };
+  }
+
+  if (score >= 6) {
+    return {
+      label: "Solid submission",
+      tone: {
+        background: "rgba(230, 179, 37, 0.12)",
+        border: "1px solid rgba(230, 179, 37, 0.30)",
+        color: "#0F2A44",
+      },
+    };
+  }
+
+  return {
+    label: "Thin submission",
+    tone: {
+      background: "rgba(220, 38, 38, 0.10)",
+      border: "1px solid rgba(220, 38, 38, 0.28)",
+      color: "#991b1b",
+    },
+  };
+}
+
 export default function AdminSubmissionsPage() {
   const supabase = useMemo(() => getSupabaseBrowser(), []);
   const [rows, setRows] = useState<Submission[]>([]);
@@ -294,6 +347,8 @@ export default function AdminSubmissionsPage() {
           const rep = reputationByUser[s.user_id];
           const risk = contributorRisk(rep?.approved_count ?? 0, rep?.rejected_count ?? 0);
           const rate = rejectionRate(rep?.approved_count ?? 0, rep?.rejected_count ?? 0);
+          const richness = submissionRichnessMeta(s);
+          const richnessScore = submissionRichnessScore(s);
           return (
           <div
             key={s.id}
@@ -367,6 +422,18 @@ export default function AdminSubmissionsPage() {
                   </span>
                   <span style={{ fontSize: 12, color: "#555" }}>
                     {rep?.sourced_count ?? 0} sourced
+                  </span>
+                  <span
+                    title={`Richness score ${richnessScore}`}
+                    style={{
+                      padding: "4px 8px",
+                      borderRadius: 999,
+                      fontSize: 12,
+                      fontWeight: 800,
+                      ...richness.tone,
+                    }}
+                  >
+                    {richness.label} · {richnessScore}
                   </span>
                 </div>
               </div>
