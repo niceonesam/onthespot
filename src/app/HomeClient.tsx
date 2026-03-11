@@ -471,6 +471,38 @@ function storyPeriodLabel(date?: string | null) {
   return null;
 }
 
+function isModernHumanDate(date?: string | null) {
+  if (!date) return false;
+  const d = date.trim();
+
+  if (/^\d{4}$/.test(d)) {
+    const year = Number(d);
+    return Number.isFinite(year) && year >= 1800;
+  }
+
+  const parsed = new Date(d);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.getFullYear() >= 1800;
+  }
+
+  return false;
+}
+
+function eraKeyForSpot(spot: Pick<Spot, "date_start" | "time_scale_out"> | null | undefined) {
+  const scale = timeScaleKey(spot ?? { date_start: null, time_scale_out: null });
+  if (scale === "geological") return "geological" as const;
+  if (scale === "ancient") return "prehistoric" as const;
+  if (isModernHumanDate(spot?.date_start)) return "modern" as const;
+  return "human" as const;
+}
+
+function backendTimeFilterForEra(era: "all" | "modern" | "human" | "prehistoric" | "geological") {
+  if (era === "modern" || era === "human") return "human";
+  if (era === "prehistoric") return "ancient";
+  if (era === "geological") return "geological";
+  return null;
+}
+
 function VisibilityBadge(props: { visibility: Spot["visibility"] }) {
   const v = props.visibility;
   if (v === "public") return null;
@@ -669,7 +701,7 @@ export default function HomePage() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [visibilityFilter, setVisibilityFilter] = useState<string>("all");
   const [tagFilter, setTagFilter] = useState<string>("all");
-  const [timeFilter, setTimeFilter] = useState<"all" | "human" | "ancient" | "geological">("all");
+  const [eraFilter, setEraFilter] = useState<"all" | "modern" | "human" | "prehistoric" | "geological">("all");
   // Optional: only works if your RPC returns is_imported (won't break if it doesn't)
   const [importedOnly, setImportedOnly] = useState(false);
   // Admin button for Admin users
@@ -792,8 +824,8 @@ export default function HomePage() {
     const catOk = categoryFilter === "all" || s.category === categoryFilter;
     const vis = (s as any).visibility ?? "public";
     const visOk = visibilityFilter === "all" || vis === visibilityFilter;
-    const timeOk = timeFilter === "all" || timeScaleKey(s) === timeFilter;
-    return catOk && visOk && timeOk;
+    const eraOk = eraFilter === "all" || eraKeyForSpot(s) === eraFilter;
+    return catOk && visOk && eraOk;
   });
 
   const rankedFilteredSpots = [...filteredSpots].sort((a, b) => {
@@ -858,12 +890,14 @@ export default function HomePage() {
     visibilityFilter !== "all"
       ? visibilityFilter.charAt(0).toUpperCase() + visibilityFilter.slice(1)
       : null,
-    timeFilter !== "all"
-      ? timeFilter === "human"
-        ? "Human history"
-        : timeFilter === "ancient"
-          ? "Ancient history"
-          : "Geological"
+    eraFilter !== "all"
+      ? eraFilter === "modern"
+        ? "Modern"
+        : eraFilter === "human"
+          ? "Human history"
+          : eraFilter === "prehistoric"
+            ? "Prehistory"
+            : "Geological"
       : null,
     tagFilter !== "all" ? `#${tagFilter}` : null,
     importedOnly ? "Imported" : null,
@@ -906,17 +940,35 @@ export default function HomePage() {
     const baseOffset = dominantScale === "human" ? 0 : dominantScale === "ancient" ? 3 : 6;
     const index = Math.min(baseOffset + sizeIndex, numStyles);
 
+    const sortedScales: Array<["geological" | "ancient" | "human", number]> = [
+      ["geological", scaleCounts.geological],
+      ["ancient", scaleCounts.ancient],
+      ["human", scaleCounts.human],
+    ];
+    sortedScales.sort((a: ["geological" | "ancient" | "human", number], b: ["geological" | "ancient" | "human", number]) => b[1] - a[1]);
+
+    const second = sortedScales[1];
+
     const dominantLabel =
       dominantScale === "geological"
         ? "mostly geological"
         : dominantScale === "ancient"
-          ? "mostly ancient"
+          ? "mostly prehistoric"
           : "mostly human history";
+
+    const secondaryLabel =
+      second && second[1] > 0
+        ? second[0] === "geological"
+          ? " · some geological"
+          : second[0] === "ancient"
+            ? " · some prehistoric"
+            : " · some human history"
+        : "";
 
     return {
       text: String(count),
       index,
-      title: `${count} spots · ${dominantLabel}`,
+      title: `${count} spots · ${dominantLabel}${secondaryLabel}`,
     };
   };
   const clusterStyles = [
@@ -1082,10 +1134,10 @@ export default function HomePage() {
     {
       key: "all",
       label: "All",
-      active: visibilityFilter === "all" && timeFilter === "all" && !importedOnly,
+      active: visibilityFilter === "all" && eraFilter === "all" && !importedOnly,
       onClick: () => {
         setVisibilityFilter("all");
-        setTimeFilter("all");
+        setEraFilter("all");
         setImportedOnly(false);
       },
     },
@@ -1108,16 +1160,22 @@ export default function HomePage() {
       onClick: () => setVisibilityFilter("group"),
     },
     {
-      key: "ancient",
-      label: "Ancient",
-      active: timeFilter === "ancient",
-      onClick: () => setTimeFilter(timeFilter === "ancient" ? "all" : "ancient"),
+      key: "modern",
+      label: "Modern",
+      active: eraFilter === "modern",
+      onClick: () => setEraFilter(eraFilter === "modern" ? "all" : "modern"),
+    },
+    {
+      key: "prehistoric",
+      label: "Prehistory",
+      active: eraFilter === "prehistoric",
+      onClick: () => setEraFilter(eraFilter === "prehistoric" ? "all" : "prehistoric"),
     },
     {
       key: "geological",
       label: "Geological",
-      active: timeFilter === "geological",
-      onClick: () => setTimeFilter(timeFilter === "geological" ? "all" : "geological"),
+      active: eraFilter === "geological",
+      onClick: () => setEraFilter(eraFilter === "geological" ? "all" : "geological"),
     },
     {
       key: "imported",
@@ -1227,14 +1285,14 @@ export default function HomePage() {
         radius_m: radiusM,
         category: categoryFilter === "all" ? null : categoryFilter,
         visibility: visibilityFilter === "all" ? null : visibilityFilter,
-        time_filter: timeFilter === "all" ? null : timeFilter,
+        time_filter: backendTimeFilterForEra(eraFilter),
         tag_filter: tagFilter === "all" ? null : tagFilter,
         q: searchText.trim() ? searchText.trim() : null,
         imported_only: importedOnly,
       });
       if (!error && data) setSpots(data as Spot[]);
     })();
-  }, [pos, radiusM, categoryFilter, searchText, importedOnly, supabase, visibilityFilter, tagFilter, timeFilter]);
+  }, [pos, radiusM, categoryFilter, searchText, importedOnly, supabase, visibilityFilter, tagFilter, eraFilter]);
 
   // Close on Escape
   useEffect(() => {
@@ -1268,7 +1326,10 @@ export default function HomePage() {
       if (typeof v.categoryFilter === "string") setCategoryFilter(v.categoryFilter);
       if (typeof v.visibilityFilter === "string") setVisibilityFilter(v.visibilityFilter);
       if (typeof v.tagFilter === "string") setTagFilter(v.tagFilter);
-      if (typeof v.timeFilter === "string") setTimeFilter(v.timeFilter);
+      if (typeof v.eraFilter === "string") setEraFilter(v.eraFilter);
+      else if (typeof v.timeFilter === "string") {
+        setEraFilter(v.timeFilter === "ancient" ? "prehistoric" : v.timeFilter as any);
+      }
       if (typeof v.importedOnly === "boolean") setImportedOnly(v.importedOnly);
     } catch {
       // ignore bad saved state
@@ -1281,12 +1342,12 @@ export default function HomePage() {
     try {
       localStorage.setItem(
         "ots_filters_v1",
-        JSON.stringify({ radiusM, searchText, categoryFilter, visibilityFilter, tagFilter, timeFilter, importedOnly })
+        JSON.stringify({ radiusM, searchText, categoryFilter, visibilityFilter, tagFilter, eraFilter, importedOnly })
       );
     } catch {
       // ignore storage errors
     }
-  }, [radiusM, searchText, categoryFilter, visibilityFilter, tagFilter, timeFilter, importedOnly]);
+  }, [radiusM, searchText, categoryFilter, visibilityFilter, tagFilter, eraFilter, importedOnly]);
 
   if (!isLoaded || !pos) return <div style={{ padding: 16 }}>Loading…</div>;
 
@@ -1665,11 +1726,12 @@ export default function HomePage() {
             </label>
 
             <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              Time:
-              <select value={timeFilter} onChange={(e) => setTimeFilter(e.target.value as any)}>
+              Era:
+              <select value={eraFilter} onChange={(e) => setEraFilter(e.target.value as any)}>
                 <option value="all">All time</option>
+                <option value="modern">Modern</option>
                 <option value="human">Human history</option>
-                <option value="ancient">Ancient history</option>
+                <option value="prehistoric">Prehistory</option>
                 <option value="geological">Geological</option>
               </select>
             </label>
@@ -2085,10 +2147,10 @@ export default function HomePage() {
                 </label>
 
                 <label style={{ display: "grid", gap: 6 }}>
-                  <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Time layer</span>
+                  <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Era</span>
                   <select
-                    value={timeFilter}
-                    onChange={(e) => setTimeFilter(e.target.value as any)}
+                    value={eraFilter}
+                    onChange={(e) => setEraFilter(e.target.value as any)}
                     style={{
                       padding: 10,
                       borderRadius: 12,
@@ -2097,8 +2159,9 @@ export default function HomePage() {
                     }}
                   >
                     <option value="all">All time</option>
+                    <option value="modern">Modern</option>
                     <option value="human">Human history</option>
-                    <option value="ancient">Ancient history</option>
+                    <option value="prehistoric">Prehistory</option>
                     <option value="geological">Geological</option>
                   </select>
                 </label>
@@ -2299,7 +2362,7 @@ export default function HomePage() {
                     setCategoryFilter("all");
                     setVisibilityFilter("all");
                     setTagFilter("all");
-                    setTimeFilter("all");
+                    setEraFilter("all");
                     setImportedOnly(false);
                     setRadiusM(2500);
                   }}
