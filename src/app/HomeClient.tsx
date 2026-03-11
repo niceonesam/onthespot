@@ -935,6 +935,31 @@ export default function HomePage() {
   const mobileListExpanded = mobileListSnap !== "peek";
   const mobileSnapOrder: Array<"peek" | "half" | "full"> = ["peek", "half", "full"];
   const shouldClusterMarkers = filteredSpots.length >= (isMobile ? 12 : 20);
+  const temporalClusterGroups =
+    eraFilter === "all"
+      ? [
+          {
+            key: "geological",
+            spots: rankedFilteredSpots.filter((s) => eraKeyForSpot(s) === "geological"),
+          },
+          {
+            key: "prehistoric",
+            spots: rankedFilteredSpots.filter((s) => eraKeyForSpot(s) === "prehistoric"),
+          },
+          {
+            key: "human",
+            spots: rankedFilteredSpots.filter((s) => {
+              const era = eraKeyForSpot(s);
+              return era === "human" || era === "modern";
+            }),
+          },
+        ].filter((group) => group.spots.length > 0)
+      : [
+          {
+            key: eraFilter,
+            spots: rankedFilteredSpots,
+          },
+        ];
   const clusterAnchorText: [number, number] = [0, 0];
   const clusterCalculator = (markers: unknown[], numStyles: number) => {
     const count = markers.length;
@@ -3028,39 +3053,44 @@ export default function HomePage() {
               <MarkerF position={pos} title="You" icon={markerIconForUser()} zIndex={1100} />
 
               {shouldClusterMarkers ? (
-                <MarkerClustererF
-                  options={{
-                  minimumClusterSize: 2,
-                  gridSize: isMobile ? 44 : 56,
-                  maxZoom: 16,
-                  styles: clusterStyles,
-                  clusterClass: "ots-map-cluster",
-                  calculator: clusterCalculator,
-                }}
-                >
-                  {(clusterer) => (
-                    <>
-                      {rankedFilteredSpots.map((s) => (
-                        <MarkerF
-                          key={s.id}
-                          clusterer={selected?.id === s.id ? undefined : clusterer}
-                          position={{ lat: s.lat_out, lng: s.lng_out }}
-                          title={s.title}
-                          icon={markerIconForVisibility(
-                            (s as any).visibility,
-                            s,
-                            selected?.id === s.id,
-                            pulsingMarkerId === s.id
-                          )}
-                          zIndex={selected?.id === s.id ? 1000 : undefined}
-                          onClick={() => {
-                            selectSpot(s);
-                          }}
-                        />
-                      ))}
-                    </>
-                  )}
-                </MarkerClustererF>
+                <>
+                  {temporalClusterGroups.map((group) => (
+                    <MarkerClustererF
+                      key={group.key}
+                      options={{
+                        minimumClusterSize: 2,
+                        gridSize: eraFilter === "all" ? (isMobile ? 38 : 48) : (isMobile ? 44 : 56),
+                        maxZoom: eraFilter === "all" ? 15 : 16,
+                        styles: clusterStyles,
+                        clusterClass: "ots-map-cluster",
+                        calculator: clusterCalculator,
+                      }}
+                    >
+                      {(clusterer) => (
+                        <>
+                          {group.spots.map((s) => (
+                            <MarkerF
+                              key={s.id}
+                              clusterer={selected?.id === s.id ? undefined : clusterer}
+                              position={{ lat: s.lat_out, lng: s.lng_out }}
+                              title={s.title}
+                              icon={markerIconForVisibility(
+                                (s as any).visibility,
+                                s,
+                                selected?.id === s.id,
+                                pulsingMarkerId === s.id
+                              )}
+                              zIndex={selected?.id === s.id ? 1000 : undefined}
+                              onClick={() => {
+                                selectSpot(s);
+                              }}
+                            />
+                          ))}
+                        </>
+                      )}
+                    </MarkerClustererF>
+                  ))}
+                </>
               ) : (
                 rankedFilteredSpots.map((s) => (
                   <MarkerF
