@@ -843,16 +843,32 @@ export default function HomePage() {
   const selectedVisibilityLabel = selected ? visibilityStoryLabel((selected as any).visibility) : null;
 
   const placeThroughTimeSpots = selected
-    ? rankedFilteredSpots
+    ? spots
         .filter((s) => {
           if (s.id === selected.id) return false;
-          const meters = Number(s.distance_m ?? Infinity);
-          return Number.isFinite(meters) && meters <= 400;
+
+          const toRad = (v: number) => (v * Math.PI) / 180;
+
+          const R = 6371000;
+          const lat1 = toRad(selected.lat_out);
+          const lat2 = toRad(s.lat_out);
+          const dLat = toRad(s.lat_out - selected.lat_out);
+          const dLng = toRad(s.lng_out - selected.lng_out);
+
+          const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1) * Math.cos(lat2) *
+              Math.sin(dLng / 2) * Math.sin(dLng / 2);
+
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          const meters = R * c;
+
+          return meters <= 400;
         })
         .sort((a, b) => {
           const scaleRank = (spot: Spot) => {
             const scale = timeScaleKey(spot);
-            return scale === "geological" ? 0 : scale === "ancient" ? 1 : 2;
+            return scale === "geological" ? 0 : scale === "ancient" ? 1 : isModernHumanDate(spot.date_start) ? 3 : 2;
           };
 
           const rankDiff = scaleRank(a) - scaleRank(b);
@@ -866,10 +882,18 @@ export default function HomePage() {
           const labelDiff = `${dateA} ${periodA}`.localeCompare(`${dateB} ${periodB}`);
           if (labelDiff !== 0) return labelDiff;
 
-          return Number(a.distance_m ?? Infinity) - Number(b.distance_m ?? Infinity);
+          return 0;
         })
         .slice(0, 5)
     : [];
+
+  function placeThroughTimeEraLabel(spot: Spot) {
+    const era = eraKeyForSpot(spot);
+    if (era === "geological") return "Geological";
+    if (era === "prehistoric") return "Prehistory";
+    if (era === "modern") return "Modern";
+    return "Human history";
+  }
 
   const availableTags = Array.from(
     new Set(
@@ -3338,104 +3362,123 @@ export default function HomePage() {
                     </div>
 
                     <div style={{ display: "grid", gap: 8 }}>
-                      {placeThroughTimeSpots.map((s) => {
+                      {placeThroughTimeSpots.map((s, index) => {
                         const timeScale = effectiveTimeScale(s);
+                        const previous = placeThroughTimeSpots[index - 1];
                         const storyDate = formatStoryDate(s.date_start);
                         const storyPeriod = s.period_label_out ?? storyPeriodLabel(s.date_start);
-
+                        
+                        const showEraDivider =
+                          !previous || placeThroughTimeEraLabel(previous) !== placeThroughTimeEraLabel(s);
                         return (
-                          <button
-                            key={s.id}
-                            type="button"
-                            onClick={() => selectSpot(s)}
-                            className="ots-surface ots-surface--border"
-                            style={{
-                              padding: 10,
-                              display: "grid",
-                              gap: 8,
-                              textAlign: "left",
-                              cursor: "pointer",
-                              background: "white",
-                            }}
-                          >
-                            <div
+                          <div key={s.id} style={{ display: "grid", gap: 6 }}>
+                            {showEraDivider && (
+                              <div
+                                className="ots-brand-heading"
+                                style={{
+                                  fontSize: 11,
+                                  letterSpacing: "0.04em",
+                                  textTransform: "uppercase",
+                                  color: "#6b7280",
+                                  paddingTop: index === 0 ? 0 : 6,
+                                }}
+                              >
+                                {placeThroughTimeEraLabel(s)}
+                              </div>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => selectSpot(s)}
+                              className="ots-surface ots-surface--border"
                               style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "start",
-                                gap: 10,
+                                padding: 10,
+                                display: "grid",
+                                gap: 8,
+                                textAlign: "left",
+                                cursor: "pointer",
+                                background: "white",
                               }}
                             >
-                              <div style={{ minWidth: 0, display: "grid", gap: 6 }}>
-                                <div
-                                  className="ots-brand-heading"
-                                  style={{ fontSize: 15, lineHeight: 1.2, color: "#111" }}
-                                >
-                                  {s.title}
+                              <div
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "start",
+                                  gap: 10,
+                                }}
+                              >
+                                <div style={{ minWidth: 0, display: "grid", gap: 6 }}>
+                                  <div
+                                    className="ots-brand-heading"
+                                    style={{ fontSize: 15, lineHeight: 1.2, color: "#111" }}
+                                  >
+                                    {s.title}
+                                  </div>
+
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      gap: 6,
+                                      flexWrap: "wrap",
+                                      alignItems: "center",
+                                    }}
+                                  >
+                                    {storyDate && (
+                                      <span
+                                        style={{
+                                          padding: "3px 8px",
+                                          borderRadius: 999,
+                                          fontSize: 11,
+                                          fontWeight: 700,
+                                          color: "#0F2A44",
+                                          background: `${timeScale.color}20`,
+                                          border: `1px solid ${timeScale.color}55`,
+                                        }}
+                                      >
+                                        {storyDate}
+                                      </span>
+                                    )}
+
+                                    {storyPeriod && storyPeriod !== storyDate && (
+                                      <span
+                                        style={{
+                                          padding: "3px 8px",
+                                          borderRadius: 999,
+                                          fontSize: 11,
+                                          fontWeight: 700,
+                                          color: "#0F2A44",
+                                          background: "rgba(107,33,168,0.10)",
+                                          border: "1px solid rgba(107,33,168,0.24)",
+                                        }}
+                                      >
+                                        {storyPeriod}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
 
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    gap: 6,
-                                    flexWrap: "wrap",
-                                    alignItems: "center",
-                                  }}
-                                >
-                                  {storyDate && (
-                                    <span
-                                      style={{
-                                        padding: "3px 8px",
-                                        borderRadius: 999,
-                                        fontSize: 11,
-                                        fontWeight: 700,
-                                        color: "#0F2A44",
-                                        background: `${timeScale.color}20`,
-                                        border: `1px solid ${timeScale.color}55`,
-                                      }}
-                                    >
-                                      {storyDate}
-                                    </span>
-                                  )}
-
-                                  {storyPeriod && storyPeriod !== storyDate && (
-                                    <span
-                                      style={{
-                                        padding: "3px 8px",
-                                        borderRadius: 999,
-                                        fontSize: 11,
-                                        fontWeight: 700,
-                                        color: "#0F2A44",
-                                        background: "rgba(107,33,168,0.10)",
-                                        border: "1px solid rgba(107,33,168,0.24)",
-                                      }}
-                                    >
-                                      {storyPeriod}
-                                    </span>
-                                  )}
+                                <div style={{ fontSize: 12, color: "#666", whiteSpace: "nowrap" }}>
+                                  {formatDistance(s.distance_m)}
                                 </div>
                               </div>
 
-                              <div style={{ fontSize: 12, color: "#666", whiteSpace: "nowrap" }}>
-                                {formatDistance(s.distance_m)}
+                              <div
+                                className="ots-story-text"
+                                style={{
+                                  fontSize: 13,
+                                  lineHeight: 1.45,
+                                  color: "#374151",
+                                  display: "-webkit-box",
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: "vertical",
+                                  overflow: "hidden",
+                                }}
+                              >
+                                {splitStory(s.description).intro || s.description}
                               </div>
-                            </div>
-
-                            <div
-                              className="ots-story-text"
-                              style={{
-                                fontSize: 13,
-                                lineHeight: 1.45,
-                                color: "#374151",
-                                display: "-webkit-box",
-                                WebkitLineClamp: 2,
-                                WebkitBoxOrient: "vertical",
-                                overflow: "hidden",
-                              }}
-                            >
-                              {splitStory(s.description).intro || s.description}
-                            </div>
-                          </button>
+                            </button>
+                          </div>
                         );
                       })}
                     </div>
