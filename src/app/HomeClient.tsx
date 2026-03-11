@@ -5,6 +5,7 @@ import { GoogleMap, MarkerF, MarkerClustererF, useLoadScript } from "@react-goog
 import { getSupabaseBrowser } from "@/lib/supabase/browser";
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
+
 import {
   formatStoryDate,
   classifyTimeScale,
@@ -18,6 +19,19 @@ import {
   dedupeChronologyTags,
 } from "@/map/temporal";
 import { discoveryScore } from "@/map/discoveryRanking";
+
+import {
+  buildClusterCalculator,
+  clusterBubbleDataUrl,
+  clusterPaletteForScale,
+  markerTimeScaleFromIcon,
+} from "@/map/clusterStyles";
+
+import {
+  markerCoreColorForDate,
+  markerIconForVisibility,
+  markerIconForUser,
+} from "@/map/markerIcons";
 
 type Spot = {
   id: string;
@@ -89,37 +103,6 @@ function splitStory(description: string) {
   const intro = parts.slice(0, 2).join(" ").trim();
   const rest = parts.slice(2).join(" ").trim();
   return { intro, rest };
-}
-
-function markerCoreColorForDate(
-  input: string | null | undefined | { date_start?: string | null; time_scale_out?: Spot["time_scale_out"] }
-) {
-  const scale = timeScaleKey(input);
-  if (scale === "geological") return "#6b21a8";
-  if (scale === "ancient") return "#E6B325";
-  return "#1FB6A6";
-}
-
-function clusterPaletteForScale(scale: "human" | "ancient" | "geological") {
-  if (scale === "geological") {
-    return { ring: "#6b21a8", core: "#8b5cf6" };
-  }
-  if (scale === "ancient") {
-    return { ring: "#E6B325", core: "#F2C94C" };
-  }
-  return { ring: "#1FB6A6", core: "#54d9cb" };
-}
-
-function markerTimeScaleFromIcon(icon: google.maps.Icon | google.maps.Symbol | string | null | undefined): "human" | "ancient" | "geological" {
-  const raw = typeof icon === "string"
-    ? icon
-    : icon && typeof icon === "object" && "url" in icon
-      ? String(icon.url ?? "")
-      : "";
-
-  if (raw.includes("ots-scale-geological")) return "geological";
-  if (raw.includes("ots-scale-ancient")) return "ancient";
-  return "human";
 }
 
 
@@ -249,24 +232,7 @@ function clamp<T extends number>(value: T, min: number, max: number) {
   return Math.max(min, Math.min(max, value)) as T;
 }
 
-function clusterBubbleDataUrl(outer: string, ring: string, core: string) {
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-      <desc>ots-cluster</desc>
-      <defs>
-        <radialGradient id="clusterGlow" cx="35%" cy="30%" r="75%">
-          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95" />
-          <stop offset="20%" stop-color="${core}" stop-opacity="0.98" />
-          <stop offset="42%" stop-color="${ring}" stop-opacity="0.96" />
-          <stop offset="100%" stop-color="${outer}" stop-opacity="1" />
-        </radialGradient>
-      </defs>
-      <circle cx="32" cy="32" r="26" fill="url(#clusterGlow)" stroke="rgba(0,0,0,0.18)" stroke-width="2" />
-      <circle cx="32" cy="32" r="18" fill="rgba(255,255,255,0.10)" />
-    </svg>
-  `;
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
-}
+
 
 export default function HomePage() {
   const supabase = getSupabaseBrowser();
@@ -572,65 +538,9 @@ export default function HomePage() {
           },
         ];
   const clusterAnchorText: [number, number] = [0, 0];
-  const clusterCalculator = (markers: unknown[], numStyles: number) => {
-    const count = markers.length;
-    let sizeIndex = 1;
 
-    if (count >= 100) sizeIndex = 3;
-    else if (count >= 20) sizeIndex = 2;
-
-    const scaleCounts: Record<"human" | "ancient" | "geological", number> = {
-      human: 0,
-      ancient: 0,
-      geological: 0,
-    };
-
-    for (const marker of markers as Array<{ getIcon?: () => google.maps.Icon | google.maps.Symbol | string | null | undefined }>) {
-      const scale = markerTimeScaleFromIcon(marker.getIcon?.());
-      scaleCounts[scale] += 1;
-    }
-
-    const dominantScale =
-      scaleCounts.geological >= scaleCounts.ancient && scaleCounts.geological >= scaleCounts.human
-        ? "geological"
-        : scaleCounts.ancient >= scaleCounts.human
-          ? "ancient"
-          : "human";
-
-    const baseOffset = dominantScale === "human" ? 0 : dominantScale === "ancient" ? 3 : 6;
-    const index = Math.min(baseOffset + sizeIndex, numStyles);
-
-    const sortedScales: Array<["geological" | "ancient" | "human", number]> = [
-      ["geological", scaleCounts.geological],
-      ["ancient", scaleCounts.ancient],
-      ["human", scaleCounts.human],
-    ];
-    sortedScales.sort((a: ["geological" | "ancient" | "human", number], b: ["geological" | "ancient" | "human", number]) => b[1] - a[1]);
-
-    const second = sortedScales[1];
-
-    const dominantLabel =
-      dominantScale === "geological"
-        ? "mostly geological"
-        : dominantScale === "ancient"
-          ? "mostly prehistoric"
-          : "mostly human history";
-
-    const secondaryLabel =
-      second && second[1] > 0
-        ? second[0] === "geological"
-          ? " · some geological"
-          : second[0] === "ancient"
-            ? " · some prehistoric"
-            : " · some human history"
-        : "";
-
-    return {
-      text: String(count),
-      index,
-      title: `${count} spots · ${dominantLabel}${secondaryLabel}`,
-    };
-  };
+  const clusterCalculator = buildClusterCalculator();
+  
   const clusterStyles = [
     // Human
     {
@@ -1070,115 +980,6 @@ export default function HomePage() {
       const z = map.getZoom();
       if (typeof z === "number" && z < 13) map.setZoom(13);
     }
-  }
-
-  function markerIconForVisibility(
-    v?: string | null,
-    spot?: { date_start?: string | null; time_scale_out?: Spot["time_scale_out"] } | null,
-    isSelected = false,
-    isPulsing = false
-  ): google.maps.Icon {
-    const size = isSelected || isPulsing ? 42 : 28;
-    const anchorX = size / 2;
-    const anchorY = size;
-
-    const stroke = isPulsing
-      ? "rgba(0,0,0,0.72)"
-      : isSelected
-        ? "rgba(0,0,0,0.58)"
-        : "rgba(0,0,0,0.35)";
-
-    const coreBase = markerCoreColorForDate(spot ?? { date_start: null, time_scale_out: null });
-    const scale = timeScaleKey(spot ?? { date_start: null, time_scale_out: null });
-    const core = isSelected || isPulsing
-      ? coreBase === "#1FB6A6"
-        ? "#54d9cb"
-        : coreBase === "#E6B325"
-          ? "#F2C94C"
-          : "#8b5cf6"
-      : coreBase;
-
-    const ring =
-      v === "friends" ? "#2563eb" :
-      v === "group" ? "#a855f7" :
-      v === "private" ? "#6b7280" :
-      "#0F2A44";
-
-    const outer = "#0F2A44";
-    const ringRadius = isSelected || isPulsing ? 10.7 : 10;
-    const goldRadius = isSelected || isPulsing ? 7.2 : 6;
-
-    const pulseTicks = isPulsing
-      ? `
-        <g opacity="0.95">
-          <animate attributeName="opacity" values="0.95;0.45;0.95" dur="1.05s" repeatCount="indefinite" />
-          <line x1="24" y1="4" x2="24" y2="0.8" stroke="${core}" stroke-width="2" stroke-linecap="round" />
-          <line x1="36.7" y1="9.3" x2="39" y2="7" stroke="${core}" stroke-width="2" stroke-linecap="round" />
-          <line x1="43" y1="18" x2="46.2" y2="18" stroke="${core}" stroke-width="2" stroke-linecap="round" />
-          <line x1="36.7" y1="26.7" x2="39" y2="29" stroke="${core}" stroke-width="2" stroke-linecap="round" />
-          <line x1="11.3" y1="9.3" x2="9" y2="7" stroke="${core}" stroke-width="2" stroke-linecap="round" />
-          <line x1="5" y1="18" x2="1.8" y2="18" stroke="${core}" stroke-width="2" stroke-linecap="round" />
-          <line x1="11.3" y1="26.7" x2="9" y2="29" stroke="${core}" stroke-width="2" stroke-linecap="round" />
-        </g>
-      `
-      : "";
-
-    const halo = isPulsing
-      ? `
-        <circle cx="24" cy="18" r="12.5" fill="${core}" opacity="0.18">
-          <animate attributeName="r" values="12.5;16.8;12.5" dur="1.05s" repeatCount="indefinite" />
-          <animate attributeName="opacity" values="0.22;0.06;0.22" dur="1.05s" repeatCount="indefinite" />
-        </circle>
-        <circle cx="24" cy="18" r="10.8" fill="none" stroke="${core}" stroke-width="2.6" opacity="0.82">
-          <animate attributeName="r" values="10.8;14.4;10.8" dur="1.05s" repeatCount="indefinite" />
-          <animate attributeName="opacity" values="0.9;0.24;0.9" dur="1.05s" repeatCount="indefinite" />
-        </circle>
-      `
-      : isSelected
-        ? `
-          <circle cx="24" cy="18" r="14" fill="${core}" opacity="0.18" />
-          <circle cx="24" cy="18" r="11.5" fill="none" stroke="${core}" stroke-width="2" opacity="0.75" />
-        `
-        : "";
-
-    const svg = `<?xml version="1.0" encoding="UTF-8"?>
-    <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 48 48">
-      <desc>ots-scale-${scale}</desc>
-      ${pulseTicks}
-      ${halo}
-      <path d="M24 46C24 46 6 28 6 18C6 8 14 2 24 2C34 2 42 8 42 18C42 28 24 46 24 46Z"
-            fill="${outer}"
-            stroke="${stroke}"
-            stroke-width="1.2"/>
-      <circle cx="24" cy="18" r="${ringRadius}" fill="${ring}" />
-      ${isPulsing ? `<circle cx="24" cy="18" r="9.6" fill="none" stroke="${core}" stroke-width="1.6" opacity="0.7"><animate attributeName="r" values="9.6;12.6;9.6" dur="1.05s" repeatCount="indefinite" /><animate attributeName="opacity" values="0.75;0.18;0.75" dur="1.05s" repeatCount="indefinite" /></circle>` : ""}
-      <circle cx="24" cy="18" r="${goldRadius}" fill="${core}" />
-    </svg>`;
-
-    return {
-      url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
-      scaledSize: new google.maps.Size(size, size),
-      anchor: new google.maps.Point(anchorX, anchorY),
-    };
-  }
-
-  function markerIconForUser(): google.maps.Icon {
-    const size = 30;
-    const anchorX = size / 2;
-    const anchorY = size / 2;
-
-    const svg = `<?xml version="1.0" encoding="UTF-8"?>
-    <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 48 48">
-      <circle cx="24" cy="24" r="18" fill="#ffffff" stroke="#0F2A44" stroke-width="2.4" />
-      <circle cx="24" cy="24" r="10" fill="#1FB6A6" />
-      <circle cx="24" cy="24" r="6" fill="#E6B325" />
-    </svg>`;
-
-    return {
-      url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
-      scaledSize: new google.maps.Size(size, size),
-      anchor: new google.maps.Point(anchorX, anchorY),
-    };
   }
 
   async function dismissOnboarding() {
