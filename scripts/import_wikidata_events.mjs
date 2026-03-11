@@ -35,7 +35,9 @@ const STATE_FILE = process.env.STATE_FILE ?? ".wikidata_import_state.json";
 const MAX_PAGES = Number(process.env.MAX_PAGES ?? 0); // 0 = unlimited
 const RESUME = String(process.env.RESUME ?? "true").toLowerCase() === "true";
 const RESET_STATE = String(process.env.RESET_STATE ?? "false").toLowerCase() === "true";
+
 const IMPORT_MODE = process.env.IMPORT_MODE ?? "event_only"; // event_only | historic_and_cultural | dated_places
+const IMPORT_REGION = process.env.IMPORT_REGION ?? "world"; // world | uk | europe
 
 const IMPORT_USER_ID = process.env.IMPORT_USER_ID;
 if (!IMPORT_USER_ID) {
@@ -159,17 +161,43 @@ function printSamples(spots, n) {
 }
 
 function buildLeanSparql(limit, offset) {
-  const baseSelect = `
-SELECT ?item ?coords ?p31 ?time ?start ?end ?desc WHERE {
+  const locationClause = `
   ?item wdt:P625 ?coords .
+`;
+
+  const ukRegionClause = `
+  ?item wdt:P17 wd:Q145 .
+`;
+
+  const europeRegionClause = `
+  ?item wdt:P17 ?country .
+  VALUES ?country {
+    wd:Q40 wd:Q31 wd:Q250 wd:Q112 wd:Q203 wd:Q208 wd:Q191 wd:Q822 wd:Q55 wd:Q213
+    wd:Q35 wd:Q39 wd:Q58 wd:Q183 wd:Q142 wd:Q224 wd:Q228 wd:Q29 wd:Q45 wd:Q155
+    wd:Q38 wd:Q37 wd:Q32 wd:Q219 wd:Q211 wd:Q218 wd:Q217 wd:Q20 wd:Q36 wd:Q159
+    wd:Q41 wd:Q28 wd:Q43 wd:Q214 wd:Q215 wd:Q216 wd:Q221 wd:Q222 wd:Q223 wd:Q225
+    wd:Q227 wd:Q229 wd:Q230 wd:Q232 wd:Q233 wd:Q235 wd:Q236 wd:Q237 wd:Q238 wd:Q241
+    wd:Q242 wd:Q244 wd:Q145
+  }
+`;
+
+  let regionClause = "";
+  if (IMPORT_REGION === "uk") regionClause = ukRegionClause;
+  if (IMPORT_REGION === "europe") regionClause = europeRegionClause;
+
+  const baseSelect = `
+PREFIX wd: <http://www.wikidata.org/entity/>
+PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+PREFIX wikibase: <http://wikiba.se/ontology#>
+PREFIX schema: <http://schema.org/>
+
+SELECT ?item ?coords ?p31 ?time ?start ?end WHERE {
+${locationClause}
+${regionClause}
   OPTIONAL { ?item wdt:P31 ?p31 . }
   OPTIONAL { ?item wdt:P585 ?time . }
   OPTIONAL { ?item wdt:P580 ?start . }
   OPTIONAL { ?item wdt:P582 ?end . }
-  OPTIONAL {
-    ?item schema:description ?desc .
-    FILTER (lang(?desc) = "en")
-  }
 `;
 
   const eventOnlyWhere = `
@@ -228,7 +256,6 @@ SELECT ?item ?coords ?p31 ?time ?start ?end ?desc WHERE {
 ${baseSelect}
 ${modeWhere}
 }
-ORDER BY ?item
 LIMIT ${limit}
 OFFSET ${offset}
 `;
@@ -240,6 +267,14 @@ function validateImportMode() {
     console.error(
       `Invalid IMPORT_MODE='${IMPORT_MODE}'. Use one of: event_only, historic_and_cultural, dated_places`
     );
+    process.exit(1);
+  }
+}
+
+function validateImportRegion() {
+  const allowed = new Set(["world", "uk", "europe"]);
+  if (!allowed.has(IMPORT_REGION)) {
+    console.error(`Invalid IMPORT_REGION='${IMPORT_REGION}'. Use one of: world, uk, europe`);
     process.exit(1);
   }
 }
@@ -338,14 +373,53 @@ function pickCategory(p31Qids, map) {
 }
 
 async function upsertBatch(batch) {
-  const { error } = await supabase
-    .from("spots")
-    .upsert(batch, { onConflict: "canonical_key" });
-  if (error) throw new Error(error.message);
+  const wikidataIds = batch
+    .map((row) => row.wikidata_id)
+    .filter((v) => typeof v === "string" && v.length > 0);
+
+  let existingByWikidataId = new Map();
+
+  if (wikidataIds.length > 0) {
+    const { data, error } = await supabase
+      .from("spots")
+      .select("id, wikidata_id")
+      .in("wikidata_id", wikidataIds);
+
+    if (error) throw new Error(error.message);
+    existingByWikidataId = new Map((data ?? []).map((row) => [row.wikidata_id, row.id]));
+  }
+
+  const inserts = [];
+  const updates = [];
+
+  for (const row of batch) {
+    const existingId = row.wikidata_id ? existingByWikidataId.get(row.wikidata_id) : null;
+    if (existingId) {
+      updates.push({ ...row, id: existingId });
+    } else {
+      inserts.push(row);
+    }
+  }
+
+  if (inserts.length > 0) {
+    const { error } = await supabase
+      .from("spots")
+      .upsert(inserts, { onConflict: "canonical_key" });
+    if (error) throw new Error(error.message);
+  }
+
+  for (const row of updates) {
+    const { id, ...payload } = row;
+    const { error } = await supabase
+      .from("spots")
+      .update(payload)
+      .eq("id", id);
+    if (error) throw new Error(error.message);
+  }
 }
 
 async function fetchPage(offset) {
-  console.log(`\n=== Page OFFSET=${offset} LIMIT=${LIMIT} pace=${pace.ms}ms mode=${IMPORT_MODE} ===`);
+  console.log(`\n=== Page OFFSET=${offset} LIMIT=${LIMIT} pace=${pace.ms}ms mode=${IMPORT_MODE} region=${IMPORT_REGION} ===`);
   const json = await sparqlQuery(buildLeanSparql(LIMIT, offset));
   return json.results.bindings;
 }
@@ -375,6 +449,7 @@ async function createPage(runId, offset, limit, paceMs) {
 
 async function main() {
   validateImportMode();
+  validateImportRegion();
   maybeResetState();
 
   const categoryMap = await loadP31CategoryMap();
@@ -426,12 +501,11 @@ async function main() {
         p31: [],
         date_start,
         date_end,
-        wikidata_description: r.desc?.value ?? null,
+        wikidata_description: null,
         source_url: `https://www.wikidata.org/wiki/${qid}`,
       };
 
       if (p31qid && !existing.p31.includes(p31qid)) existing.p31.push(p31qid);
-      if (!existing.wikidata_description && r.desc?.value) existing.wikidata_description = r.desc.value;
 
       byQid.set(qid, existing);
     }
@@ -471,9 +545,7 @@ async function main() {
         title,
       });
 
-      const description = e.wikidata_description
-        ? e.wikidata_description
-        : "Imported event. See source for details.";
+      const description = "Imported from Wikidata. See source for details.";
 
       const ds = toDateOrNull(e.date_start);
       const de = toDateOrNull(e.date_end);
@@ -572,6 +644,7 @@ async function main() {
 
   console.log("\n=== Summary ===");
   console.log(`Import mode: ${IMPORT_MODE}`);
+  console.log(`Import region: ${IMPORT_REGION}`);
   console.log(`Prepared: ${totalPrepared}`);
   console.log(`Written:  ${DRY_RUN ? 0 : totalWritten}`);
   console.log(`State file: ${STATE_FILE}`);
