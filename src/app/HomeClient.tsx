@@ -752,8 +752,7 @@ export default function HomePage() {
     const catOk = categoryFilter === "all" || s.category === categoryFilter;
     const vis = (s as any).visibility ?? "public";
     const visOk = visibilityFilter === "all" || vis === visibilityFilter;
-    const timeOk = timeFilter === "all" || timeScaleKey(s.date_start) === timeFilter;
-    return catOk && visOk && timeOk;
+    return catOk && visOk;
   });
 
   const rankedFilteredSpots = [...filteredSpots].sort((a, b) => {
@@ -1156,13 +1155,14 @@ export default function HomePage() {
         radius_m: radiusM,
         category: categoryFilter === "all" ? null : categoryFilter,
         visibility: visibilityFilter === "all" ? null : visibilityFilter,
+        time_filter: timeFilter === "all" ? null : timeFilter,
         tag_filter: tagFilter === "all" ? null : tagFilter,
         q: searchText.trim() ? searchText.trim() : null,
         imported_only: importedOnly,
       });
       if (!error && data) setSpots(data as Spot[]);
     })();
-  }, [pos, radiusM, categoryFilter, searchText, importedOnly, supabase, visibilityFilter, tagFilter]);
+  }, [pos, radiusM, categoryFilter, searchText, importedOnly, supabase, visibilityFilter, tagFilter, timeFilter]);
 
   // Close on Escape
   useEffect(() => {
