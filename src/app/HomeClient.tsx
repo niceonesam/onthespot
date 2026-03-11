@@ -810,6 +810,35 @@ export default function HomePage() {
     : null;
   const selectedVisibilityLabel = selected ? visibilityStoryLabel((selected as any).visibility) : null;
 
+  const placeThroughTimeSpots = selected
+    ? rankedFilteredSpots
+        .filter((s) => {
+          if (s.id === selected.id) return false;
+          const meters = Number(s.distance_m ?? Infinity);
+          return Number.isFinite(meters) && meters <= 400;
+        })
+        .sort((a, b) => {
+          const scaleRank = (spot: Spot) => {
+            const scale = timeScaleKey(spot);
+            return scale === "geological" ? 0 : scale === "ancient" ? 1 : 2;
+          };
+
+          const rankDiff = scaleRank(a) - scaleRank(b);
+          if (rankDiff !== 0) return rankDiff;
+
+          const dateA = a.date_start ?? "";
+          const dateB = b.date_start ?? "";
+          const periodA = a.period_label_out ?? storyPeriodLabel(a.date_start) ?? "";
+          const periodB = b.period_label_out ?? storyPeriodLabel(b.date_start) ?? "";
+
+          const labelDiff = `${dateA} ${periodA}`.localeCompare(`${dateB} ${periodB}`);
+          if (labelDiff !== 0) return labelDiff;
+
+          return Number(a.distance_m ?? Infinity) - Number(b.distance_m ?? Infinity);
+        })
+        .slice(0, 5)
+    : [];
+
   const availableTags = Array.from(
     new Set(
       spots.flatMap((s) => (s.tags ?? []).map((t) => String(t).trim()).filter(Boolean))
@@ -3233,6 +3262,120 @@ export default function HomePage() {
                         {selectedStoryParts.rest}
                       </p>
                     )}
+                  </div>
+                )}
+
+                {!selectedSheetIsPeek && placeThroughTimeSpots.length > 0 && (
+                  <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
+                    <div
+                      className="ots-brand-heading"
+                      style={{ fontSize: 12, opacity: 0.68, letterSpacing: "0.02em" }}
+                    >
+                      This place through time
+                    </div>
+
+                    <div style={{ display: "grid", gap: 8 }}>
+                      {placeThroughTimeSpots.map((s) => {
+                        const timeScale = effectiveTimeScale(s);
+                        const storyDate = formatStoryDate(s.date_start);
+                        const storyPeriod = s.period_label_out ?? storyPeriodLabel(s.date_start);
+
+                        return (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => selectSpot(s)}
+                            className="ots-surface ots-surface--border"
+                            style={{
+                              padding: 10,
+                              display: "grid",
+                              gap: 8,
+                              textAlign: "left",
+                              cursor: "pointer",
+                              background: "white",
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "start",
+                                gap: 10,
+                              }}
+                            >
+                              <div style={{ minWidth: 0, display: "grid", gap: 6 }}>
+                                <div
+                                  className="ots-brand-heading"
+                                  style={{ fontSize: 15, lineHeight: 1.2, color: "#111" }}
+                                >
+                                  {s.title}
+                                </div>
+
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    gap: 6,
+                                    flexWrap: "wrap",
+                                    alignItems: "center",
+                                  }}
+                                >
+                                  {storyDate && (
+                                    <span
+                                      style={{
+                                        padding: "3px 8px",
+                                        borderRadius: 999,
+                                        fontSize: 11,
+                                        fontWeight: 700,
+                                        color: "#0F2A44",
+                                        background: `${timeScale.color}20`,
+                                        border: `1px solid ${timeScale.color}55`,
+                                      }}
+                                    >
+                                      {storyDate}
+                                    </span>
+                                  )}
+
+                                  {storyPeriod && storyPeriod !== storyDate && (
+                                    <span
+                                      style={{
+                                        padding: "3px 8px",
+                                        borderRadius: 999,
+                                        fontSize: 11,
+                                        fontWeight: 700,
+                                        color: "#0F2A44",
+                                        background: "rgba(107,33,168,0.10)",
+                                        border: "1px solid rgba(107,33,168,0.24)",
+                                      }}
+                                    >
+                                      {storyPeriod}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div style={{ fontSize: 12, color: "#666", whiteSpace: "nowrap" }}>
+                                {formatDistance(s.distance_m)}
+                              </div>
+                            </div>
+
+                            <div
+                              className="ots-story-text"
+                              style={{
+                                fontSize: 13,
+                                lineHeight: 1.45,
+                                color: "#374151",
+                                display: "-webkit-box",
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: "vertical",
+                                overflow: "hidden",
+                              }}
+                            >
+                              {splitStory(s.description).intro || s.description}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
