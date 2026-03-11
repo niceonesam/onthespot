@@ -793,7 +793,7 @@ export default function HomePage() {
     const vis = (s as any).visibility ?? "public";
     const visOk = visibilityFilter === "all" || vis === visibilityFilter;
     const timeOk = timeFilter === "all" || timeScaleKey(s) === timeFilter;
-    return catOk && visOk;
+    return catOk && visOk && timeOk;
   });
 
   const rankedFilteredSpots = [...filteredSpots].sort((a, b) => {
@@ -1324,7 +1324,7 @@ export default function HomePage() {
 
   function markerIconForVisibility(
     v?: string | null,
-    date?: string | null,
+    spot?: Pick<Spot, "date_start" | "time_scale_out"> | null,
     isSelected = false,
     isPulsing = false
   ): google.maps.Icon {
@@ -1338,8 +1338,8 @@ export default function HomePage() {
         ? "rgba(0,0,0,0.58)"
         : "rgba(0,0,0,0.35)";
 
-    const coreBase = markerCoreColorForDate({ date_start: date ?? null, time_scale_out: null });
-    const scale = timeScaleKey(date);
+    const coreBase = markerCoreColorForDate(spot ?? { date_start: null, time_scale_out: null });
+    const scale = timeScaleKey(spot ?? { date_start: null, time_scale_out: null });
     const core = isSelected || isPulsing
       ? coreBase === "#1FB6A6"
         ? "#54d9cb"
@@ -2751,22 +2751,6 @@ export default function HomePage() {
                                   </span>
                                 )}
 
-                                {storyPeriodLabel(s.date_start) && storyPeriodLabel(s.date_start) !== formatStoryDate(s.date_start) && (
-                                  <span
-                                    style={{
-                                      padding: "4px 8px",
-                                      borderRadius: 999,
-                                      fontSize: 12,
-                                      fontWeight: 700,
-                                      color: "#0F2A44",
-                                      background: "rgba(107,33,168,0.10)",
-                                      border: "1px solid rgba(107,33,168,0.24)",
-                                    }}
-                                  >
-                                    {storyPeriodLabel(s.date_start)}
-                                  </span>
-                                )}
-
                                 {sourceBadgeLabel(s.source_url) && (
                                   <span
                                     style={{
@@ -2948,7 +2932,7 @@ export default function HomePage() {
                           title={s.title}
                           icon={markerIconForVisibility(
                             (s as any).visibility,
-                            s.date_start,
+                            s,
                             selected?.id === s.id,
                             pulsingMarkerId === s.id
                           )}
@@ -2969,7 +2953,7 @@ export default function HomePage() {
                     title={s.title}
                     icon={markerIconForVisibility(
                       (s as any).visibility,
-                      s.date_start,
+                      s,
                       selected?.id === s.id,
                       pulsingMarkerId === s.id
                     )}
