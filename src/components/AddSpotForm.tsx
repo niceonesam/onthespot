@@ -1020,17 +1020,27 @@ const [loadingCategories, setLoadingCategories] = useState(false);
 
             <div style={{ display: "grid", gap: 12 }}>
               <label style={{ display: "grid", gap: 6 }}>
-                <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Date (optional)</span>
+                <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>
+                  Date or period (optional)
+                </span>
                 <input
-                  type="date"
+                  type="text"
                   value={dateStart}
                   onChange={(e) => setDateStart(e.target.value)}
+                  placeholder="e.g. 2026-03-12, 150Ma, Jurassic, 12000 BP"
+                  inputMode="text"
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  spellCheck={false}
                   style={{
                     padding: 10,
                     borderRadius: 12,
                     border: "1px solid rgba(0,0,0,0.2)",
                   }}
                 />
+                <div style={{ fontSize: 12, color: "#666" }}>
+                  You can enter a normal date, a historical year, or a geological / archaeological period such as 150Ma, Jurassic, 12000 BP, or Younger Dryas.
+                </div>
               </label>
 
               <label style={{ display: "grid", gap: 6 }}>

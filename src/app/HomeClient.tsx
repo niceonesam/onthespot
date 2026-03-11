@@ -247,6 +247,14 @@ function classifyTimeScale(date?: string | null) {
   return { scale: "human", color: "#1FB6A6" };
 }
 
+function timeScaleKey(date?: string | null): "human" | "ancient" | "geological" {
+  const result = classifyTimeScale(date);
+  if (result.scale === "ancient" || result.scale === "geological") {
+    return result.scale;
+  }
+  return "human";
+}
+
 function geologicalPeriodFromMa(ma?: number | null) {
   if (!ma || !Number.isFinite(ma)) return null;
 
@@ -284,6 +292,20 @@ function visibilityStoryLabel(visibility?: string | null) {
   if (visibility === "group") return "Shared with group";
   if (visibility === "private") return "Private story";
   return "Public story";
+}
+
+function dedupeChronologyTags(tags: string[] | null | undefined, date?: string | null) {
+  const safeTags = Array.isArray(tags) ? tags : [];
+  const dateLabel = formatStoryDate(date)?.trim().toLowerCase() ?? null;
+  const periodLabel = storyPeriodLabel(date)?.trim().toLowerCase() ?? null;
+
+  return safeTags.filter((tag) => {
+    const t = String(tag).trim().toLowerCase();
+    if (!t) return false;
+    if (dateLabel && t === dateLabel) return false;
+    if (periodLabel && t === periodLabel) return false;
+    return true;
+  });
 }
 
 function storyPeriodLabel(date?: string | null) {
@@ -577,6 +599,7 @@ export default function HomePage() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [visibilityFilter, setVisibilityFilter] = useState<string>("all");
   const [tagFilter, setTagFilter] = useState<string>("all");
+  const [timeFilter, setTimeFilter] = useState<"all" | "human" | "ancient" | "geological">("all");
   // Optional: only works if your RPC returns is_imported (won't break if it doesn't)
   const [importedOnly, setImportedOnly] = useState(false);
   // Admin button for Admin users
@@ -699,7 +722,8 @@ export default function HomePage() {
     const catOk = categoryFilter === "all" || s.category === categoryFilter;
     const vis = (s as any).visibility ?? "public";
     const visOk = visibilityFilter === "all" || vis === visibilityFilter;
-    return catOk && visOk;
+    const timeOk = timeFilter === "all" || timeScaleKey(s.date_start) === timeFilter;
+    return catOk && visOk && timeOk;
   });
 
   const rankedFilteredSpots = [...filteredSpots].sort((a, b) => {
@@ -732,6 +756,13 @@ export default function HomePage() {
     selectedCategoryLabel,
     visibilityFilter !== "all"
       ? visibilityFilter.charAt(0).toUpperCase() + visibilityFilter.slice(1)
+      : null,
+    timeFilter !== "all"
+      ? timeFilter === "human"
+        ? "Human history"
+        : timeFilter === "ancient"
+          ? "Ancient history"
+          : "Geological"
       : null,
     tagFilter !== "all" ? `#${tagFilter}` : null,
     importedOnly ? "Imported" : null,
@@ -865,9 +896,10 @@ export default function HomePage() {
     {
       key: "all",
       label: "All",
-      active: visibilityFilter === "all" && !importedOnly,
+      active: visibilityFilter === "all" && timeFilter === "all" && !importedOnly,
       onClick: () => {
         setVisibilityFilter("all");
+        setTimeFilter("all");
         setImportedOnly(false);
       },
     },
@@ -888,6 +920,18 @@ export default function HomePage() {
       label: "Group",
       active: visibilityFilter === "group",
       onClick: () => setVisibilityFilter("group"),
+    },
+    {
+      key: "ancient",
+      label: "Ancient",
+      active: timeFilter === "ancient",
+      onClick: () => setTimeFilter(timeFilter === "ancient" ? "all" : "ancient"),
+    },
+    {
+      key: "geological",
+      label: "Geological",
+      active: timeFilter === "geological",
+      onClick: () => setTimeFilter(timeFilter === "geological" ? "all" : "geological"),
     },
     {
       key: "imported",
@@ -1037,6 +1081,7 @@ export default function HomePage() {
       if (typeof v.categoryFilter === "string") setCategoryFilter(v.categoryFilter);
       if (typeof v.visibilityFilter === "string") setVisibilityFilter(v.visibilityFilter);
       if (typeof v.tagFilter === "string") setTagFilter(v.tagFilter);
+      if (typeof v.timeFilter === "string") setTimeFilter(v.timeFilter);
       if (typeof v.importedOnly === "boolean") setImportedOnly(v.importedOnly);
     } catch {
       // ignore bad saved state
@@ -1049,12 +1094,12 @@ export default function HomePage() {
     try {
       localStorage.setItem(
         "ots_filters_v1",
-        JSON.stringify({ radiusM, searchText, categoryFilter, visibilityFilter, tagFilter, importedOnly })
+        JSON.stringify({ radiusM, searchText, categoryFilter, visibilityFilter, tagFilter, timeFilter, importedOnly })
       );
     } catch {
       // ignore storage errors
     }
-  }, [radiusM, searchText, categoryFilter, visibilityFilter, tagFilter, importedOnly]);
+  }, [radiusM, searchText, categoryFilter, visibilityFilter, tagFilter, timeFilter, importedOnly]);
 
   if (!isLoaded || !pos) return <div style={{ padding: 16 }}>Loading…</div>;
 
@@ -1418,6 +1463,16 @@ export default function HomePage() {
                 <option value="friends">Friends</option>
                 <option value="group">Group</option>
                 <option value="private">Private</option>
+              </select>
+            </label>
+
+            <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              Time:
+              <select value={timeFilter} onChange={(e) => setTimeFilter(e.target.value as any)}>
+                <option value="all">All time</option>
+                <option value="human">Human history</option>
+                <option value="ancient">Ancient history</option>
+                <option value="geological">Geological</option>
               </select>
             </label>
 
@@ -1831,6 +1886,25 @@ export default function HomePage() {
                   </select>
                 </label>
 
+                <label style={{ display: "grid", gap: 6 }}>
+                  <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Time layer</span>
+                  <select
+                    value={timeFilter}
+                    onChange={(e) => setTimeFilter(e.target.value as any)}
+                    style={{
+                      padding: 10,
+                      borderRadius: 12,
+                      border: "1px solid rgba(0,0,0,0.2)",
+                      background: "white",
+                    }}
+                  >
+                    <option value="all">All time</option>
+                    <option value="human">Human history</option>
+                    <option value="ancient">Ancient history</option>
+                    <option value="geological">Geological</option>
+                  </select>
+                </label>
+
                 {availableTags.length > 0 && (
                   <div style={{ display: "grid", gap: 6 }}>
                     <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Tag</span>
@@ -2027,6 +2101,7 @@ export default function HomePage() {
                     setCategoryFilter("all");
                     setVisibilityFilter("all");
                     setTagFilter("all");
+                    setTimeFilter("all");
                     setImportedOnly(false);
                     setRadiusM(2500);
                   }}
@@ -2339,7 +2414,10 @@ export default function HomePage() {
                           )}
                         </div>
 
-                        <TagPills tags={rankedFilteredSpots[0].tags} max={2} />
+                        <TagPills
+                          tags={dedupeChronologyTags(rankedFilteredSpots[0].tags, rankedFilteredSpots[0].date_start)}
+                          max={2}
+                        />
 
                         <div style={{ fontSize: 12, opacity: 0.7, marginTop: 2 }}>
                           {rankedFilteredSpots[0].what3words
@@ -2483,6 +2561,23 @@ export default function HomePage() {
                                   );
                                 })()}
 
+                                {storyPeriodLabel(s.date_start) &&
+                                storyPeriodLabel(s.date_start) !== formatStoryDate(s.date_start) && (
+                                  <span
+                                    style={{
+                                      padding: "4px 8px",
+                                      borderRadius: 999,
+                                      fontSize: 12,
+                                      fontWeight: 700,
+                                      color: "#0F2A44",
+                                      background: "rgba(107,33,168,0.10)",
+                                      border: "1px solid rgba(107,33,168,0.24)",
+                                    }}
+                                  >
+                                    {storyPeriodLabel(s.date_start)}
+                                  </span>
+                                )}
+
                                 {storyPeriodLabel(s.date_start) && storyPeriodLabel(s.date_start) !== formatStoryDate(s.date_start) && (
                                   <span
                                     style={{
@@ -2521,7 +2616,7 @@ export default function HomePage() {
                                 {s.what3words ? `${s.distance_m ? " · " : ""}///${s.what3words}` : null}
                               </div>
 
-                              <TagPills tags={s.tags} max={3} />
+                              <TagPills tags={dedupeChronologyTags(s.tags, s.date_start)} max={3} />
                             </div>
 
                             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -2871,7 +2966,10 @@ export default function HomePage() {
                       {selected.what3words ? `${selected.distance_m ? " · " : ""}///${selected.what3words}` : null}
                     </div>
 
-                    <TagPills tags={selected.tags} max={selectedSheetIsPeek ? 3 : 6} />
+                    <TagPills
+                      tags={dedupeChronologyTags(selected.tags, selected.date_start)}
+                      max={selectedSheetIsPeek ? 3 : 6}
+                    />
                   </div>
 
                   <button
