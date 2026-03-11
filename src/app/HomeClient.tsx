@@ -255,6 +255,35 @@ function timeScaleKey(date?: string | null): "human" | "ancient" | "geological" 
   return "human";
 }
 
+function markerCoreColorForDate(date?: string | null) {
+  const scale = timeScaleKey(date);
+  if (scale === "geological") return "#6b21a8"; // deep purple
+  if (scale === "ancient") return "#E6B325"; // gold
+  return "#1FB6A6"; // teal
+}
+
+function clusterPaletteForScale(scale: "human" | "ancient" | "geological") {
+  if (scale === "geological") {
+    return { ring: "#6b21a8", core: "#8b5cf6" };
+  }
+  if (scale === "ancient") {
+    return { ring: "#E6B325", core: "#F2C94C" };
+  }
+  return { ring: "#1FB6A6", core: "#54d9cb" };
+}
+
+function markerTimeScaleFromIcon(icon: google.maps.Icon | google.maps.Symbol | string | null | undefined): "human" | "ancient" | "geological" {
+  const raw = typeof icon === "string"
+    ? icon
+    : icon && typeof icon === "object" && "url" in icon
+      ? String(icon.url ?? "")
+      : "";
+
+  if (raw.includes("ots-scale-geological")) return "geological";
+  if (raw.includes("ots-scale-ancient")) return "ancient";
+  return "human";
+}
+
 function geologicalPeriodFromMa(ma?: number | null) {
   if (!ma || !Number.isFinite(ma)) return null;
 
@@ -509,6 +538,7 @@ function clamp<T extends number>(value: T, min: number, max: number) {
 function clusterBubbleDataUrl(outer: string, ring: string, core: string) {
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+      <desc>ots-cluster</desc>
       <defs>
         <radialGradient id="clusterGlow" cx="35%" cy="30%" r="75%">
           <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95" />
@@ -779,20 +809,49 @@ export default function HomePage() {
   const clusterAnchorText: [number, number] = [0, 0];
   const clusterCalculator = (markers: unknown[], numStyles: number) => {
     const count = markers.length;
-    let index = 1;
+    let sizeIndex = 1;
 
-    if (count >= 100) index = 3;
-    else if (count >= 20) index = 2;
+    if (count >= 100) sizeIndex = 3;
+    else if (count >= 20) sizeIndex = 2;
+
+    const scaleCounts: Record<"human" | "ancient" | "geological", number> = {
+      human: 0,
+      ancient: 0,
+      geological: 0,
+    };
+
+    for (const marker of markers as Array<{ getIcon?: () => google.maps.Icon | google.maps.Symbol | string | null | undefined }>) {
+      const scale = markerTimeScaleFromIcon(marker.getIcon?.());
+      scaleCounts[scale] += 1;
+    }
+
+    const dominantScale =
+      scaleCounts.geological >= scaleCounts.ancient && scaleCounts.geological >= scaleCounts.human
+        ? "geological"
+        : scaleCounts.ancient >= scaleCounts.human
+          ? "ancient"
+          : "human";
+
+    const baseOffset = dominantScale === "human" ? 0 : dominantScale === "ancient" ? 3 : 6;
+    const index = Math.min(baseOffset + sizeIndex, numStyles);
+
+    const dominantLabel =
+      dominantScale === "geological"
+        ? "mostly geological"
+        : dominantScale === "ancient"
+          ? "mostly ancient"
+          : "mostly human history";
 
     return {
       text: String(count),
-      index: Math.min(index, numStyles),
-      title: `${count} spots`,
+      index,
+      title: `${count} spots · ${dominantLabel}`,
     };
   };
   const clusterStyles = [
+    // Human
     {
-      url: clusterBubbleDataUrl("#0F2A44", "#1FB6A6", "#E6B325"),
+      url: clusterBubbleDataUrl("#0F2A44", "#1FB6A6", "#54d9cb"),
       height: 52,
       width: 52,
       textColor: "#ffffff",
@@ -801,7 +860,7 @@ export default function HomePage() {
       anchorText: clusterAnchorText,
     },
     {
-      url: clusterBubbleDataUrl("#0F2A44", "#1FB6A6", "#E6B325"),
+      url: clusterBubbleDataUrl("#0F2A44", "#1FB6A6", "#54d9cb"),
       height: 64,
       width: 64,
       textColor: "#ffffff",
@@ -810,7 +869,63 @@ export default function HomePage() {
       anchorText: clusterAnchorText,
     },
     {
-      url: clusterBubbleDataUrl("#0F2A44", "#1FB6A6", "#E6B325"),
+      url: clusterBubbleDataUrl("#0F2A44", "#1FB6A6", "#54d9cb"),
+      height: 78,
+      width: 78,
+      textColor: "#ffffff",
+      textSize: 20,
+      fontWeight: "800",
+      anchorText: clusterAnchorText,
+    },
+    // Ancient
+    {
+      url: clusterBubbleDataUrl("#0F2A44", "#E6B325", "#F2C94C"),
+      height: 52,
+      width: 52,
+      textColor: "#ffffff",
+      textSize: 17,
+      fontWeight: "800",
+      anchorText: clusterAnchorText,
+    },
+    {
+      url: clusterBubbleDataUrl("#0F2A44", "#E6B325", "#F2C94C"),
+      height: 64,
+      width: 64,
+      textColor: "#ffffff",
+      textSize: 18,
+      fontWeight: "800",
+      anchorText: clusterAnchorText,
+    },
+    {
+      url: clusterBubbleDataUrl("#0F2A44", "#E6B325", "#F2C94C"),
+      height: 78,
+      width: 78,
+      textColor: "#ffffff",
+      textSize: 20,
+      fontWeight: "800",
+      anchorText: clusterAnchorText,
+    },
+    // Geological
+    {
+      url: clusterBubbleDataUrl("#0F2A44", "#6b21a8", "#8b5cf6"),
+      height: 52,
+      width: 52,
+      textColor: "#ffffff",
+      textSize: 17,
+      fontWeight: "800",
+      anchorText: clusterAnchorText,
+    },
+    {
+      url: clusterBubbleDataUrl("#0F2A44", "#6b21a8", "#8b5cf6"),
+      height: 64,
+      width: 64,
+      textColor: "#ffffff",
+      textSize: 18,
+      fontWeight: "800",
+      anchorText: clusterAnchorText,
+    },
+    {
+      url: clusterBubbleDataUrl("#0F2A44", "#6b21a8", "#8b5cf6"),
       height: 78,
       width: 78,
       textColor: "#ffffff",
@@ -1166,6 +1281,7 @@ export default function HomePage() {
 
   function markerIconForVisibility(
     v?: string | null,
+    date?: string | null,
     isSelected = false,
     isPulsing = false
   ): google.maps.Icon {
@@ -1179,12 +1295,21 @@ export default function HomePage() {
         ? "rgba(0,0,0,0.58)"
         : "rgba(0,0,0,0.35)";
 
-    const gold = isSelected || isPulsing ? "#F2C94C" : "#E6B325";
+    const coreBase = markerCoreColorForDate(date);
+    const scale = timeScaleKey(date);
+    const core = isSelected || isPulsing
+      ? coreBase === "#1FB6A6"
+        ? "#54d9cb"
+        : coreBase === "#E6B325"
+          ? "#F2C94C"
+          : "#8b5cf6"
+      : coreBase;
+
     const ring =
       v === "friends" ? "#2563eb" :
-      v === "group" ? "#7c3aed" :
+      v === "group" ? "#a855f7" :
       v === "private" ? "#6b7280" :
-      "#1FB6A6";
+      "#0F2A44";
 
     const outer = "#0F2A44";
     const ringRadius = isSelected || isPulsing ? 10.7 : 10;
@@ -1194,37 +1319,38 @@ export default function HomePage() {
       ? `
         <g opacity="0.95">
           <animate attributeName="opacity" values="0.95;0.45;0.95" dur="1.05s" repeatCount="indefinite" />
-          <line x1="24" y1="4" x2="24" y2="0.8" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
-          <line x1="36.7" y1="9.3" x2="39" y2="7" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
-          <line x1="43" y1="18" x2="46.2" y2="18" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
-          <line x1="36.7" y1="26.7" x2="39" y2="29" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
-          <line x1="11.3" y1="9.3" x2="9" y2="7" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
-          <line x1="5" y1="18" x2="1.8" y2="18" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
-          <line x1="11.3" y1="26.7" x2="9" y2="29" stroke="${gold}" stroke-width="2" stroke-linecap="round" />
+          <line x1="24" y1="4" x2="24" y2="0.8" stroke="${core}" stroke-width="2" stroke-linecap="round" />
+          <line x1="36.7" y1="9.3" x2="39" y2="7" stroke="${core}" stroke-width="2" stroke-linecap="round" />
+          <line x1="43" y1="18" x2="46.2" y2="18" stroke="${core}" stroke-width="2" stroke-linecap="round" />
+          <line x1="36.7" y1="26.7" x2="39" y2="29" stroke="${core}" stroke-width="2" stroke-linecap="round" />
+          <line x1="11.3" y1="9.3" x2="9" y2="7" stroke="${core}" stroke-width="2" stroke-linecap="round" />
+          <line x1="5" y1="18" x2="1.8" y2="18" stroke="${core}" stroke-width="2" stroke-linecap="round" />
+          <line x1="11.3" y1="26.7" x2="9" y2="29" stroke="${core}" stroke-width="2" stroke-linecap="round" />
         </g>
       `
       : "";
 
     const halo = isPulsing
       ? `
-        <circle cx="24" cy="18" r="12.5" fill="${gold}" opacity="0.18">
+        <circle cx="24" cy="18" r="12.5" fill="${core}" opacity="0.18">
           <animate attributeName="r" values="12.5;16.8;12.5" dur="1.05s" repeatCount="indefinite" />
           <animate attributeName="opacity" values="0.22;0.06;0.22" dur="1.05s" repeatCount="indefinite" />
         </circle>
-        <circle cx="24" cy="18" r="10.8" fill="none" stroke="${gold}" stroke-width="2.6" opacity="0.82">
+        <circle cx="24" cy="18" r="10.8" fill="none" stroke="${core}" stroke-width="2.6" opacity="0.82">
           <animate attributeName="r" values="10.8;14.4;10.8" dur="1.05s" repeatCount="indefinite" />
           <animate attributeName="opacity" values="0.9;0.24;0.9" dur="1.05s" repeatCount="indefinite" />
         </circle>
       `
       : isSelected
         ? `
-          <circle cx="24" cy="18" r="14" fill="${gold}" opacity="0.18" />
-          <circle cx="24" cy="18" r="11.5" fill="none" stroke="${gold}" stroke-width="2" opacity="0.75" />
+          <circle cx="24" cy="18" r="14" fill="${core}" opacity="0.18" />
+          <circle cx="24" cy="18" r="11.5" fill="none" stroke="${core}" stroke-width="2" opacity="0.75" />
         `
         : "";
 
     const svg = `<?xml version="1.0" encoding="UTF-8"?>
     <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 48 48">
+      <desc>ots-scale-${scale}</desc>
       ${pulseTicks}
       ${halo}
       <path d="M24 46C24 46 6 28 6 18C6 8 14 2 24 2C34 2 42 8 42 18C42 28 24 46 24 46Z"
@@ -1232,8 +1358,8 @@ export default function HomePage() {
             stroke="${stroke}"
             stroke-width="1.2"/>
       <circle cx="24" cy="18" r="${ringRadius}" fill="${ring}" />
-      ${isPulsing ? `<circle cx="24" cy="18" r="9.6" fill="none" stroke="${gold}" stroke-width="1.6" opacity="0.7"><animate attributeName="r" values="9.6;12.6;9.6" dur="1.05s" repeatCount="indefinite" /><animate attributeName="opacity" values="0.75;0.18;0.75" dur="1.05s" repeatCount="indefinite" /></circle>` : ""}
-      <circle cx="24" cy="18" r="${goldRadius}" fill="${gold}" />
+      ${isPulsing ? `<circle cx="24" cy="18" r="9.6" fill="none" stroke="${core}" stroke-width="1.6" opacity="0.7"><animate attributeName="r" values="9.6;12.6;9.6" dur="1.05s" repeatCount="indefinite" /><animate attributeName="opacity" values="0.75;0.18;0.75" dur="1.05s" repeatCount="indefinite" /></circle>` : ""}
+      <circle cx="24" cy="18" r="${goldRadius}" fill="${core}" />
     </svg>`;
 
     return {
@@ -2775,6 +2901,7 @@ export default function HomePage() {
                           title={s.title}
                           icon={markerIconForVisibility(
                             (s as any).visibility,
+                            s.date_start,
                             selected?.id === s.id,
                             pulsingMarkerId === s.id
                           )}
@@ -2795,6 +2922,7 @@ export default function HomePage() {
                     title={s.title}
                     icon={markerIconForVisibility(
                       (s as any).visibility,
+                      s.date_start,
                       selected?.id === s.id,
                       pulsingMarkerId === s.id
                     )}
