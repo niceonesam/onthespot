@@ -13,10 +13,13 @@ function LoginInner() {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [cardActive, setCardActive] = useState(false);
+  const [emailValue, setEmailValue] = useState("");
+  const [passwordValue, setPasswordValue] = useState("");
   const action = useMemo(
     () => (mode === "login" ? "/auth/signin" : "/auth/signup"),
     [mode]
   );
+  const hasStartedTyping = emailValue.trim().length > 0 || passwordValue.length > 0;
 
   return (
     <div
@@ -171,6 +174,7 @@ function LoginInner() {
               autoComplete="email"
               className="ots-input"
               style={{ color: "#111", minHeight: 52 }}
+              onChange={(e) => setEmailValue(e.target.value)}
               required
             />
           </label>
@@ -184,6 +188,7 @@ function LoginInner() {
               autoComplete={mode === "signup" ? "new-password" : "current-password"}
               className="ots-input"
               style={{ color: "#111", minHeight: 52 }}
+              onChange={(e) => setPasswordValue(e.target.value)}
               required
             />
             <button
@@ -210,12 +215,20 @@ function LoginInner() {
             className="ots-btn"
             disabled={submitting}
             style={{
-              borderColor: "rgba(15,42,68,0.14)",
-              background: "linear-gradient(180deg, rgba(31,182,166,0.24), rgba(31,182,166,0.12))",
+              borderColor: hasStartedTyping
+                ? "rgba(15,42,68,0.18)"
+                : "rgba(15,42,68,0.14)",
+              background: hasStartedTyping
+                ? "linear-gradient(180deg, rgba(31,182,166,0.32), rgba(31,182,166,0.16))"
+                : "linear-gradient(180deg, rgba(31,182,166,0.24), rgba(31,182,166,0.12))",
               color: "#0F2A44",
               fontWeight: 800,
               minHeight: 52,
-              boxShadow: "0 12px 28px rgba(31,182,166,0.16), inset 0 1px 0 rgba(255,255,255,0.55)",
+              boxShadow: hasStartedTyping
+                ? "0 14px 32px rgba(31,182,166,0.22), inset 0 1px 0 rgba(255,255,255,0.65)"
+                : "0 12px 28px rgba(31,182,166,0.16), inset 0 1px 0 rgba(255,255,255,0.55)",
+              transform: hasStartedTyping ? "translateY(-1px)" : "translateY(0)",
+              transition: "background 180ms ease, box-shadow 180ms ease, transform 180ms ease, border-color 180ms ease",
             }}
           >
             {submitting ? "Working…" : mode === "login" ? "Continue" : "Create account"}

@@ -62,7 +62,11 @@ const ONBOARDING_STEPS = [
 function formatDistance(meters: number) {
   if (!Number.isFinite(meters)) return "";
   if (meters < 1000) return `${Math.round(meters)} m`;
-  return `${(meters / 1000).toFixed(1)} km`;
+
+  const km = meters / 1000;
+
+  if (km < 10) return `${km.toFixed(1)} km`;
+  return `${Math.round(km)} km`;
 }
 
 function splitStory(description: string) {
@@ -70,6 +74,310 @@ function splitStory(description: string) {
   const intro = parts.slice(0, 2).join(" ").trim();
   const rest = parts.slice(2).join(" ").trim();
   return { intro, rest };
+}
+
+function formatStoryDate(date?: string | null) {
+  if (!date) return null;
+
+  const d = date.trim();
+
+  // ---- BP / cal BP formats (e.g. "12900 BP", "11700 cal BP")
+  const bpMatch = d.match(/^([\d,]+(?:\.\d+)?)\s*(cal\s*)?bp$/i);
+  if (bpMatch) {
+    const raw = Number(bpMatch[1].replace(/,/g, ""));
+    const isCal = Boolean(bpMatch[2]);
+
+    if (Number.isFinite(raw)) {
+      const rounded = raw >= 1000 ? Math.round(raw) : Number(raw.toFixed(1));
+      return isCal
+        ? `${rounded.toLocaleString()} cal BP`
+        : `${rounded.toLocaleString()} BP`;
+    }
+  }
+
+  // ---- Named Late Glacial / palaeoenvironmental events
+  if (/younger\s+dryas/i.test(d)) return "Younger Dryas";
+  if (/late\s+glacial/i.test(d)) return "Late Glacial";
+  if (/b[øo]lling[-–\s]*aller[øo]d/i.test(d)) return "Bølling–Allerød";
+  if (/older\s+dryas/i.test(d)) return "Older Dryas";
+
+  // ---- Pure year (e.g. "1874")
+  const yearOnly = /^-?\d{1,6}$/.test(d) ? Number(d) : null;
+  if (yearOnly !== null) {
+    if (yearOnly >= 1800 && yearOnly <= 1899) return `${yearOnly}s`;
+    if (yearOnly >= 1900 && yearOnly <= 1999) return `${yearOnly}s`;
+    if (yearOnly >= 2000 && yearOnly <= 2099) return `${yearOnly}s`;
+
+    if (yearOnly < 0) {
+      const abs = Math.abs(yearOnly);
+      return `${abs.toLocaleString()} BC`;
+    }
+
+    if (yearOnly >= 1 && yearOnly < 500) return `${yearOnly} AD`;
+    if (yearOnly >= 500 && yearOnly < 1500) return `${yearOnly} AD`;
+    if (yearOnly >= 1500 && yearOnly < 1800) return `${yearOnly} AD`;
+
+    return String(yearOnly);
+  }
+
+  // ---- Geological shorthand (e.g. "150Ma", "2.4Ga")
+  const geoMatch = d.match(/^([\d.]+)\s*(ka|ma|ga)$/i);
+  if (geoMatch) {
+    const value = Number(geoMatch[1]);
+    const unit = geoMatch[2].toLowerCase();
+
+    if (unit === "ka") return `${value} thousand years ago`;
+    if (unit === "ma") return `${value} million years ago`;
+    if (unit === "ga") return `${value} billion years ago`;
+  }
+
+  // ---- Already geological phrases
+  if (/million years/i.test(d)) return d;
+  if (/billion years/i.test(d)) return d;
+  if (/thousand years/i.test(d)) return d;
+
+  // ---- Named geological periods
+  const periods = [
+    "Cambrian",
+    "Ordovician",
+    "Silurian",
+    "Devonian",
+    "Carboniferous",
+    "Permian",
+    "Triassic",
+    "Jurassic",
+    "Cretaceous",
+    "Paleogene",
+    "Neogene",
+    "Quaternary",
+    "Holocene",
+    "Pleistocene",
+  ];
+
+  for (const p of periods) {
+    if (d.toLowerCase().includes(p.toLowerCase())) {
+      return p;
+    }
+  }
+
+  try {
+    return new Date(d).toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  } catch {
+    return d;
+  }
+}
+
+function classifyTimeScale(date?: string | null) {
+  if (!date) return { scale: "human", color: "#1FB6A6" };
+
+  const d = date.trim().toLowerCase();
+
+  // BP / cal BP formats
+  const bpMatch = d.match(/^([\d,]+(?:\.\d+)?)\s*(cal\s*)?bp$/i);
+  if (bpMatch) {
+    const raw = Number(bpMatch[1].replace(/,/g, ""));
+    if (Number.isFinite(raw)) {
+      if (raw >= 11700) {
+        return { scale: "geological", color: "#6b21a8" };
+      }
+      return { scale: "ancient", color: "#E6B325" };
+    }
+  }
+
+  // Named Late Glacial / palaeoenvironmental phases
+  if (
+    d.includes("younger dryas") ||
+    d.includes("late glacial") ||
+    d.includes("older dryas") ||
+    d.includes("bølling") ||
+    d.includes("bolling") ||
+    d.includes("allerød") ||
+    d.includes("allerod")
+  ) {
+    return { scale: "geological", color: "#6b21a8" };
+  }
+
+  // Geological shorthand like 150Ma, 2.4Ga, 12ka
+  const geo = d.match(/^([\d.]+)\s*(ka|ma|ga)$/i);
+  if (geo) {
+    const unit = geo[2].toLowerCase();
+    if (unit === "ma" || unit === "ga") {
+      return { scale: "geological", color: "#6b21a8" };
+    }
+    if (unit === "ka") {
+      return { scale: "ancient", color: "#E6B325" };
+    }
+  }
+
+  // Geological period names
+  const geoPeriods = [
+    "cambrian",
+    "ordovician",
+    "silurian",
+    "devonian",
+    "carboniferous",
+    "permian",
+    "triassic",
+    "jurassic",
+    "cretaceous",
+    "paleogene",
+    "neogene",
+    "quaternary",
+    "holocene",
+    "pleistocene",
+  ];
+
+  if (geoPeriods.some((p) => d.includes(p))) {
+    return { scale: "geological", color: "#6b21a8" };
+  }
+
+  // BCE / BC and deep prehistory
+  if (d.includes("bc") || d.includes("bce") || /^-\d+/.test(d)) {
+    const numeric = /^-\d{1,6}$/.test(d) ? Math.abs(Number(d)) : null;
+    if (numeric != null && numeric >= 11700) {
+      return { scale: "geological", color: "#6b21a8" };
+    }
+    return { scale: "ancient", color: "#E6B325" };
+  }
+
+  return { scale: "human", color: "#1FB6A6" };
+}
+
+function geologicalPeriodFromMa(ma?: number | null) {
+  if (!ma || !Number.isFinite(ma)) return null;
+
+  if (ma < 0.012) return "Holocene";
+  if (ma < 2.6) return "Pleistocene";
+  if (ma < 23) return "Neogene";
+  if (ma < 66) return "Paleogene";
+  if (ma < 145) return "Cretaceous";
+  if (ma < 201) return "Jurassic";
+  if (ma < 252) return "Triassic";
+  if (ma < 299) return "Permian";
+  if (ma < 359) return "Carboniferous";
+  if (ma < 419) return "Devonian";
+  if (ma < 444) return "Silurian";
+  if (ma < 485) return "Ordovician";
+  return "Cambrian";
+}
+
+function sourceBadgeLabel(url?: string | null) {
+  if (!url) return null;
+
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, "");
+    if (host.includes("wikipedia.org")) return "Wikipedia source";
+    if (host.includes("gov.uk")) return "Government source";
+    if (host.includes("archive")) return "Archive source";
+    return "External source";
+  } catch {
+    return "External source";
+  }
+}
+
+function visibilityStoryLabel(visibility?: string | null) {
+  if (visibility === "friends") return "Shared with friends";
+  if (visibility === "group") return "Shared with group";
+  if (visibility === "private") return "Private story";
+  return "Public story";
+}
+
+function storyPeriodLabel(date?: string | null) {
+  if (!date) return null;
+
+  const d = date.trim();
+
+  // BP / cal BP formats
+  const bpMatch = d.match(/^([\d,]+(?:\.\d+)?)\s*(cal\s*)?bp$/i);
+  if (bpMatch) {
+    const raw = Number(bpMatch[1].replace(/,/g, ""));
+    if (Number.isFinite(raw)) {
+      if (raw >= 11700 && raw <= 12900) return "Younger Dryas";
+      if (raw > 12900 && raw <= 14600) return "Late Glacial";
+      if (raw > 14600 && raw <= 29000) return "Upper Paleolithic";
+      if (raw > 29000) return "Deep prehistory";
+      if (raw >= 7000 && raw < 11700) return "Mesolithic";
+      if (raw >= 4500 && raw < 7000) return "Neolithic";
+      if (raw >= 2500 && raw < 4500) return "Bronze Age";
+      if (raw >= 800 && raw < 2500) return "Iron Age";
+      return null;
+    }
+  }
+
+  // Named palaeo events
+  if (/younger\s+dryas/i.test(d)) return "Younger Dryas";
+  if (/late\s+glacial/i.test(d)) return "Late Glacial";
+  if (/b[øo]lling[-–\s]*aller[øo]d/i.test(d)) return "Bølling–Allerød";
+  if (/older\s+dryas/i.test(d)) return "Older Dryas";
+
+  // Pure year
+  const yearOnly = /^-?\d{1,6}$/.test(d) ? Number(d) : null;
+  if (yearOnly !== null) {
+    if (yearOnly >= 1800 && yearOnly <= 1899) return "19th century";
+    if (yearOnly >= 1900 && yearOnly <= 1999) return "20th century";
+    if (yearOnly >= 2000 && yearOnly <= 2099) return "21st century";
+
+    if (yearOnly < 0) {
+      const abs = Math.abs(yearOnly);
+      if (abs >= 11700 && abs <= 50000) return "Upper Paleolithic";
+      if (abs >= 9700 && abs < 11700) return "Younger Dryas / Late Upper Paleolithic";
+      if (abs >= 7000 && abs < 9700) return "Mesolithic";
+      if (abs >= 4500 && abs < 7000) return "Neolithic";
+      if (abs >= 2500 && abs < 4500) return "Bronze Age";
+      if (abs >= 800 && abs < 2500) return "Iron Age";
+      return null;
+    }
+
+    if (yearOnly >= 1 && yearOnly < 500) return "Late Antiquity";
+    if (yearOnly >= 500 && yearOnly < 1500) return "Medieval";
+    if (yearOnly >= 1500 && yearOnly < 1800) return "Early Modern";
+
+    return null;
+  }
+
+  // Geological shorthand
+  const geoMatch = d.match(/^([\d.]+)\s*(ka|ma|ga)$/i);
+  if (geoMatch) {
+    const value = Number(geoMatch[1]);
+    const unit = geoMatch[2].toLowerCase();
+
+    if (unit === "ma") return geologicalPeriodFromMa(value);
+    if (unit === "ga") return "Deep time";
+    if (unit === "ka") {
+      if (value >= 11.7 && value <= 12.9) return "Younger Dryas";
+      if (value > 12.9 && value <= 14.6) return "Late Glacial";
+      if (value >= 7 && value < 11.7) return "Mesolithic";
+      if (value >= 4.5 && value < 7) return "Neolithic";
+    }
+  }
+
+  // Named geological periods
+  const periods = [
+    "Cambrian",
+    "Ordovician",
+    "Silurian",
+    "Devonian",
+    "Carboniferous",
+    "Permian",
+    "Triassic",
+    "Jurassic",
+    "Cretaceous",
+    "Paleogene",
+    "Neogene",
+    "Quaternary",
+    "Holocene",
+    "Pleistocene",
+  ];
+
+  for (const p of periods) {
+    if (d.toLowerCase().includes(p.toLowerCase())) return p;
+  }
+
+  return null;
 }
 
 function VisibilityBadge(props: { visibility: Spot["visibility"] }) {
@@ -401,6 +709,10 @@ export default function HomePage() {
   });
 
   const selectedStoryParts = selected ? splitStory(selected.description) : null;
+  const selectedStoryDate = selected ? formatStoryDate(selected.date_start) : null;
+  const selectedSourceBadge = selected ? sourceBadgeLabel(selected.source_url) : null;
+  const selectedStoryPeriod = selected ? storyPeriodLabel(selected.date_start) : null;
+  const selectedVisibilityLabel = selected ? visibilityStoryLabel((selected as any).visibility) : null;
 
   const availableTags = Array.from(
     new Set(
@@ -1955,16 +2267,84 @@ export default function HomePage() {
                         alignItems: "start",
                       }}
                     >
-                      <div style={{ minWidth: 0 }}>
+                      <div style={{ minWidth: 0, display: "grid", gap: 6 }}>
                         <div
                           className="ots-brand-heading"
                           style={{ fontWeight: 900, color: "#111", lineHeight: 1.15, fontSize: 16 }}
                         >
                           {rankedFilteredSpots[0].title}
                         </div>
+
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: 6,
+                            flexWrap: "wrap",
+                            alignItems: "center",
+                          }}
+                        >
+                          {formatStoryDate(rankedFilteredSpots[0].date_start) && (() => {
+                            const timeScale = classifyTimeScale(rankedFilteredSpots[0].date_start);
+                            const color = timeScale.color;
+
+                            return (
+                              <span
+                                style={{
+                                  padding: "3px 8px",
+                                  borderRadius: 999,
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  color: "#0F2A44",
+                                  background: `${color}20`,
+                                  border: `1px solid ${color}55`,
+                                }}
+                                title={`${timeScale.scale} timescale`}
+                              >
+                                {formatStoryDate(rankedFilteredSpots[0].date_start)}
+                              </span>
+                            );
+                          })()}
+
+                          {storyPeriodLabel(rankedFilteredSpots[0].date_start) &&
+                            storyPeriodLabel(rankedFilteredSpots[0].date_start) !== formatStoryDate(rankedFilteredSpots[0].date_start) && (
+                              <span
+                                style={{
+                                  padding: "3px 8px",
+                                  borderRadius: 999,
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  color: "#0F2A44",
+                                  background: "rgba(107,33,168,0.10)",
+                                  border: "1px solid rgba(107,33,168,0.24)",
+                                }}
+                              >
+                                {storyPeriodLabel(rankedFilteredSpots[0].date_start)}
+                              </span>
+                            )}
+
+                          {sourceBadgeLabel(rankedFilteredSpots[0].source_url) && (
+                            <span
+                              style={{
+                                padding: "3px 8px",
+                                borderRadius: 999,
+                                fontSize: 11,
+                                fontWeight: 700,
+                                color: "#0F2A44",
+                                background: "rgba(31,182,166,0.10)",
+                                border: "1px solid rgba(31,182,166,0.24)",
+                              }}
+                            >
+                              {sourceBadgeLabel(rankedFilteredSpots[0].source_url)}
+                            </span>
+                          )}
+                        </div>
+
                         <TagPills tags={rankedFilteredSpots[0].tags} max={2} />
-                        <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
-                          {rankedFilteredSpots[0].what3words ? `///${rankedFilteredSpots[0].what3words}` : "Tap to browse nearby stories"}
+
+                        <div style={{ fontSize: 12, opacity: 0.7, marginTop: 2 }}>
+                          {rankedFilteredSpots[0].what3words
+                            ? `///${rankedFilteredSpots[0].what3words}`
+                            : "Tap to browse nearby stories"}
                         </div>
                       </div>
 
@@ -2042,12 +2422,12 @@ export default function HomePage() {
                             style={{
                               display: "flex",
                               justifyContent: "space-between",
-                              gap: 8,
+                              gap: 10,
                               alignItems: "start",
                             }}
                           >
-                            <div style={{ minWidth: 0, flex: 1 }}>
-                              <div style={{ display: "flex", gap: 8, alignItems: "center", minWidth: 0 }}>
+                            <div style={{ minWidth: 0, flex: 1, display: "grid", gap: 8 }}>
+                              <div style={{ display: "flex", gap: 8, alignItems: "center", minWidth: 0, flexWrap: "wrap" }}>
                                 <strong
                                   className="ots-brand-heading"
                                   style={{ lineHeight: 1.15, fontSize: 16, color: "#111" }}
@@ -2056,14 +2436,95 @@ export default function HomePage() {
                                 </strong>
                                 <VisibilityBadge visibility={s.visibility} />
                               </div>
+
+                              <div
+                                style={{
+                                  display: "flex",
+                                  gap: 8,
+                                  flexWrap: "wrap",
+                                  alignItems: "center",
+                                }}
+                              >
+                                {visibilityStoryLabel(s.visibility) && s.visibility !== "public" && (
+                                  <span
+                                    style={{
+                                      padding: "4px 8px",
+                                      borderRadius: 999,
+                                      fontSize: 12,
+                                      fontWeight: 700,
+                                      color: "#0F2A44",
+                                      background: "rgba(15,42,68,0.05)",
+                                      border: "1px solid rgba(15,42,68,0.08)",
+                                    }}
+                                  >
+                                    {visibilityStoryLabel(s.visibility)}
+                                  </span>
+                                )}
+
+                                {formatStoryDate(s.date_start) && (() => {
+                                  const timeScale = classifyTimeScale(s.date_start);
+                                  const color = timeScale.color;
+
+                                  return (
+                                    <span
+                                      style={{
+                                        padding: "4px 8px",
+                                        borderRadius: 999,
+                                        fontSize: 12,
+                                        fontWeight: 700,
+                                        color: "#0F2A44",
+                                        background: `${color}20`,
+                                        border: `1px solid ${color}55`,
+                                      }}
+                                      title={`${timeScale.scale} timescale`}
+                                    >
+                                      {formatStoryDate(s.date_start)}
+                                    </span>
+                                  );
+                                })()}
+
+                                {storyPeriodLabel(s.date_start) && storyPeriodLabel(s.date_start) !== formatStoryDate(s.date_start) && (
+                                  <span
+                                    style={{
+                                      padding: "4px 8px",
+                                      borderRadius: 999,
+                                      fontSize: 12,
+                                      fontWeight: 700,
+                                      color: "#0F2A44",
+                                      background: "rgba(107,33,168,0.10)",
+                                      border: "1px solid rgba(107,33,168,0.24)",
+                                    }}
+                                  >
+                                    {storyPeriodLabel(s.date_start)}
+                                  </span>
+                                )}
+
+                                {sourceBadgeLabel(s.source_url) && (
+                                  <span
+                                    style={{
+                                      padding: "4px 8px",
+                                      borderRadius: 999,
+                                      fontSize: 12,
+                                      fontWeight: 700,
+                                      color: "#0F2A44",
+                                      background: "rgba(31,182,166,0.10)",
+                                      border: "1px solid rgba(31,182,166,0.24)",
+                                    }}
+                                  >
+                                    {sourceBadgeLabel(s.source_url)}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="ots-story-text" style={{ opacity: 0.78, fontSize: 13, lineHeight: 1.45 }}>
+                                {s.distance_m ? `${formatDistance(s.distance_m)} away` : null}
+                                {s.what3words ? `${s.distance_m ? " · " : ""}///${s.what3words}` : null}
+                              </div>
+
                               <TagPills tags={s.tags} max={3} />
                             </div>
 
                             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                              <span style={{ opacity: 0.75, whiteSpace: "nowrap" }}>
-                                {formatDistance(s.distance_m)}
-                              </span>
-
                               {userId && s.user_id === userId && (
                                 <button
                                   type="button"
@@ -2086,23 +2547,20 @@ export default function HomePage() {
                             </div>
                           </div>
 
-                          <div style={{ opacity: 0.68, fontSize: 12, marginTop: 6, lineHeight: 1.3 }}>
-                            {s.what3words ? `///${s.what3words}` : ""}
-                          </div>
-
                           <div
                             className="ots-story-text"
                             style={{
-                              marginTop: 6,
-                              opacity: 0.85,
-                              lineHeight: 1.4,
+                              marginTop: 10,
+                              color: "#1f2937",
+                              lineHeight: 1.5,
                               display: "-webkit-box",
-                              WebkitLineClamp: 2,
+                              WebkitLineClamp: 3,
                               WebkitBoxOrient: "vertical",
                               overflow: "hidden",
+                              fontSize: 14,
                             }}
                           >
-                            {s.description}
+                            {splitStory(s.description).intro || s.description}
                           </div>
 
                           <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -2126,6 +2584,29 @@ export default function HomePage() {
                             >
                               📍 Navigate
                             </a>
+
+                            {s.source_url && (
+                              <a
+                                href={s.source_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 6,
+                                  padding: "7px 10px",
+                                  borderRadius: 999,
+                                  border: "1px solid rgba(0,0,0,0.14)",
+                                  textDecoration: "none",
+                                  color: "#111",
+                                  fontWeight: 700,
+                                  background: "white",
+                                }}
+                              >
+                                Source
+                              </a>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -2287,28 +2768,109 @@ export default function HomePage() {
                   />
                 </button>
 
-                <div
+                                <div
                   style={{
                     display: "flex",
                     justifyContent: "space-between",
-                    gap: 8,
+                    gap: 12,
                     alignItems: "start",
                   }}
                 >
-                  <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ minWidth: 0, flex: 1, display: "grid", gap: 10 }}>
                     <div style={{ display: "flex", gap: 8, alignItems: "center", minWidth: 0, flexWrap: "wrap" }}>
                       <h3
                         className="ots-brand-heading"
                         style={{
                           margin: 0,
-                          fontSize: selectedSheetIsPeek ? 18 : 22,
-                          lineHeight: 1.15,
+                          fontSize: selectedSheetIsPeek ? 18 : 26,
+                          lineHeight: 1.12,
                         }}
                       >
                         {selected.title}
                       </h3>
                       <VisibilityBadge visibility={selected.visibility} />
                     </div>
+
+                    {!selectedSheetIsPeek && (
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 8,
+                          flexWrap: "wrap",
+                          alignItems: "center",
+                        }}
+                      >
+                        {selectedStoryDate && (
+                          <span
+                            style={{
+                              padding: "4px 8px",
+                              borderRadius: 999,
+                              fontSize: 12,
+                              fontWeight: 700,
+                              color: "#0F2A44",
+                              background: "rgba(230,179,37,0.10)",
+                              border: "1px solid rgba(230,179,37,0.22)",
+                            }}
+                          >
+                            {selectedStoryDate}
+                          </span>
+                        )}
+
+                        {selectedStoryPeriod && selectedStoryPeriod !== selectedStoryDate && (
+                          <span
+                            style={{
+                              padding: "4px 8px",
+                              borderRadius: 999,
+                              fontSize: 12,
+                              fontWeight: 700,
+                              color: "#0F2A44",
+                              background: "rgba(107,33,168,0.10)",
+                              border: "1px solid rgba(107,33,168,0.24)",
+                            }}
+                          >
+                            {selectedStoryPeriod}
+                          </span>
+                        )}
+
+                        {selectedVisibilityLabel && (
+                          <span
+                            style={{
+                              padding: "4px 8px",
+                              borderRadius: 999,
+                              fontSize: 12,
+                              fontWeight: 700,
+                              color: "#0F2A44",
+                              background: "rgba(15,42,68,0.05)",
+                              border: "1px solid rgba(15,42,68,0.08)",
+                            }}
+                          >
+                            {selectedVisibilityLabel}
+                          </span>
+                        )}
+
+                        {selectedSourceBadge && (
+                          <span
+                            style={{
+                              padding: "4px 8px",
+                              borderRadius: 999,
+                              fontSize: 12,
+                              fontWeight: 700,
+                              color: "#0F2A44",
+                              background: "rgba(31,182,166,0.10)",
+                              border: "1px solid rgba(31,182,166,0.24)",
+                            }}
+                          >
+                            {selectedSourceBadge}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="ots-story-text" style={{ opacity: 0.82, fontSize: 14, lineHeight: 1.5 }}>
+                      {selected.distance_m ? `${formatDistance(selected.distance_m)} away` : null}
+                      {selected.what3words ? `${selected.distance_m ? " · " : ""}///${selected.what3words}` : null}
+                    </div>
+
                     <TagPills tags={selected.tags} max={selectedSheetIsPeek ? 3 : 6} />
                   </div>
 
@@ -2326,12 +2888,7 @@ export default function HomePage() {
                   </button>
                 </div>
 
-                <div style={{ opacity: 0.75, marginTop: 8, fontSize: 14 }}>
-                  {selected.what3words ? `///${selected.what3words}` : null}
-                  {selected.distance_m ? `${selected.what3words ? " • " : ""}${formatDistance(selected.distance_m)} away` : null}
-                </div>
-
-                <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
                   <a
                     href={`https://www.google.com/maps/dir/?api=1&destination=${selected.lat_out},${selected.lng_out}`}
                     target="_blank"
@@ -2362,7 +2919,7 @@ export default function HomePage() {
                         fontWeight: 700,
                       }}
                     >
-                      Source
+                      View source
                     </a>
                   )}
                 </div>
@@ -2373,16 +2930,16 @@ export default function HomePage() {
                     alt={selected.title}
                     style={{
                       width: "100%",
-                      borderRadius: 12,
-                      marginTop: 12,
-                      maxHeight: selectedSheetIsHalf ? 180 : 240,
+                      borderRadius: 14,
+                      marginTop: 14,
+                      maxHeight: selectedSheetIsHalf ? 200 : 280,
                       objectFit: "cover",
                     }}
                   />
                 )}
 
                 {!selectedSheetIsPeek && (
-                  <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
+                  <div style={{ marginTop: 14, display: "grid", gap: 12 }}>
                     <div
                       className="ots-brand-heading"
                       style={{ fontSize: 12, opacity: 0.68, letterSpacing: "0.02em" }}
@@ -2392,53 +2949,33 @@ export default function HomePage() {
 
                     <p
                       className="ots-story-text"
-                      style={{ marginTop: 0, fontSize: 16, lineHeight: 1.6 }}
+                      style={{
+                        marginTop: 0,
+                        marginBottom: 0,
+                        fontSize: selectedSheetIsHalf ? 17 : 18,
+                        lineHeight: 1.68,
+                        color: "#1f2937",
+                      }}
                     >
-                      {selectedSheetIsHalf && selectedStoryParts?.intro && selectedStoryParts.intro.length > 220
-                        ? selectedStoryParts.intro.slice(0, 220) + "…"
+                      {selectedSheetIsHalf && selectedStoryParts?.intro && selectedStoryParts.intro.length > 260
+                        ? selectedStoryParts.intro.slice(0, 260) + "…"
                         : selectedStoryParts?.intro ?? ""}
                     </p>
 
                     {selectedSheetIsFull && selectedStoryParts?.rest && (
                       <p
                         className="ots-story-text"
-                        style={{ marginTop: 0, opacity: 0.94, lineHeight: 1.7 }}
+                        style={{
+                          marginTop: 0,
+                          marginBottom: 0,
+                          opacity: 0.94,
+                          lineHeight: 1.78,
+                          color: "#374151",
+                        }}
                       >
                         {selectedStoryParts.rest}
                       </p>
                     )}
-
-                    <div
-                      className="ots-surface ots-surface--border"
-                      style={{
-                        padding: 10,
-                        display: "flex",
-                        gap: 10,
-                        flexWrap: "wrap",
-                        alignItems: "center",
-                      }}
-                    >
-                      {selected.date_start && (
-                        <span style={{ fontSize: 13, color: "#444", fontWeight: 700 }}>
-                          {selected.date_start}
-                        </span>
-                      )}
-
-                      {selected.source_url && (
-                        <a
-                          href={selected.source_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{
-                            fontSize: 13,
-                            fontWeight: 700,
-                            textDecoration: "none",
-                          }}
-                        >
-                          View source
-                        </a>
-                      )}
-                    </div>
                   </div>
                 )}
               </div>
