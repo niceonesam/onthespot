@@ -25,6 +25,8 @@ type Spot = {
   lat_out: number;
   lng_out: number;
   is_imported: boolean;
+  time_scale_out?: "human" | "ancient" | "geological" | string | null;
+  period_label_out?: string | null;
 };
 
 type SpotCategory = { id: string; label: string };
@@ -247,19 +249,53 @@ function classifyTimeScale(date?: string | null) {
   return { scale: "human", color: "#1FB6A6" };
 }
 
-function timeScaleKey(date?: string | null): "human" | "ancient" | "geological" {
-  const result = classifyTimeScale(date);
+function effectiveTimeScale(
+  spot: Pick<Spot, "date_start" | "time_scale_out"> | null | undefined
+) {
+  if (
+    spot?.time_scale_out === "human" ||
+    spot?.time_scale_out === "ancient" ||
+    spot?.time_scale_out === "geological"
+  ) {
+    return {
+      scale: spot.time_scale_out,
+      color:
+        spot.time_scale_out === "geological"
+          ? "#6b21a8"
+          : spot.time_scale_out === "ancient"
+            ? "#E6B325"
+            : "#1FB6A6",
+    };
+  }
+
+  return classifyTimeScale(spot?.date_start);
+}
+
+function timeScaleKey(
+  input: string | null | undefined | Pick<Spot, "date_start" | "time_scale_out">
+): "human" | "ancient" | "geological" {
+  if (input && typeof input === "object") {
+    const result = effectiveTimeScale(input);
+    if (result.scale === "ancient" || result.scale === "geological") {
+      return result.scale;
+    }
+    return "human";
+  }
+
+  const result = classifyTimeScale(input ?? null);
   if (result.scale === "ancient" || result.scale === "geological") {
     return result.scale;
   }
   return "human";
 }
 
-function markerCoreColorForDate(date?: string | null) {
-  const scale = timeScaleKey(date);
-  if (scale === "geological") return "#6b21a8"; // deep purple
-  if (scale === "ancient") return "#E6B325"; // gold
-  return "#1FB6A6"; // teal
+function markerCoreColorForDate(
+  input: string | null | undefined | Pick<Spot, "date_start" | "time_scale_out">
+) {
+  const scale = timeScaleKey(input);
+  if (scale === "geological") return "#6b21a8";
+  if (scale === "ancient") return "#E6B325";
+  return "#1FB6A6";
 }
 
 function clusterPaletteForScale(scale: "human" | "ancient" | "geological") {
@@ -323,10 +359,14 @@ function visibilityStoryLabel(visibility?: string | null) {
   return "Public story";
 }
 
-function dedupeChronologyTags(tags: string[] | null | undefined, date?: string | null) {
+function dedupeChronologyTags(
+  tags: string[] | null | undefined,
+  date?: string | null,
+  periodLabelOut?: string | null
+) {
   const safeTags = Array.isArray(tags) ? tags : [];
   const dateLabel = formatStoryDate(date)?.trim().toLowerCase() ?? null;
-  const periodLabel = storyPeriodLabel(date)?.trim().toLowerCase() ?? null;
+  const periodLabel = (periodLabelOut ?? storyPeriodLabel(date))?.trim().toLowerCase() ?? null;
 
   return safeTags.filter((tag) => {
     const t = String(tag).trim().toLowerCase();
@@ -752,6 +792,7 @@ export default function HomePage() {
     const catOk = categoryFilter === "all" || s.category === categoryFilter;
     const vis = (s as any).visibility ?? "public";
     const visOk = visibilityFilter === "all" || vis === visibilityFilter;
+    const timeOk = timeFilter === "all" || timeScaleKey(s) === timeFilter;
     return catOk && visOk;
   });
 
@@ -764,7 +805,9 @@ export default function HomePage() {
   const selectedStoryParts = selected ? splitStory(selected.description) : null;
   const selectedStoryDate = selected ? formatStoryDate(selected.date_start) : null;
   const selectedSourceBadge = selected ? sourceBadgeLabel(selected.source_url) : null;
-  const selectedStoryPeriod = selected ? storyPeriodLabel(selected.date_start) : null;
+  const selectedStoryPeriod = selected
+    ? (selected.period_label_out ?? storyPeriodLabel(selected.date_start))
+    : null;
   const selectedVisibilityLabel = selected ? visibilityStoryLabel((selected as any).visibility) : null;
 
   const availableTags = Array.from(
@@ -1295,7 +1338,7 @@ export default function HomePage() {
         ? "rgba(0,0,0,0.58)"
         : "rgba(0,0,0,0.35)";
 
-    const coreBase = markerCoreColorForDate(date);
+    const coreBase = markerCoreColorForDate({ date_start: date ?? null, time_scale_out: null });
     const scale = timeScaleKey(date);
     const core = isSelected || isPulsing
       ? coreBase === "#1FB6A6"
@@ -2485,7 +2528,7 @@ export default function HomePage() {
                           }}
                         >
                           {formatStoryDate(rankedFilteredSpots[0].date_start) && (() => {
-                            const timeScale = classifyTimeScale(rankedFilteredSpots[0].date_start);
+                            const timeScale = effectiveTimeScale(rankedFilteredSpots[0]);
                             const color = timeScale.color;
 
                             return (
@@ -2506,8 +2549,8 @@ export default function HomePage() {
                             );
                           })()}
 
-                          {storyPeriodLabel(rankedFilteredSpots[0].date_start) &&
-                            storyPeriodLabel(rankedFilteredSpots[0].date_start) !== formatStoryDate(rankedFilteredSpots[0].date_start) && (
+                          {(rankedFilteredSpots[0].period_label_out ?? storyPeriodLabel(rankedFilteredSpots[0].date_start)) &&
+                            (rankedFilteredSpots[0].period_label_out ?? storyPeriodLabel(rankedFilteredSpots[0].date_start)) !== formatStoryDate(rankedFilteredSpots[0].date_start) && (
                               <span
                                 style={{
                                   padding: "3px 8px",
@@ -2519,7 +2562,7 @@ export default function HomePage() {
                                   border: "1px solid rgba(107,33,168,0.24)",
                                 }}
                               >
-                                {storyPeriodLabel(rankedFilteredSpots[0].date_start)}
+                                {rankedFilteredSpots[0].period_label_out ?? storyPeriodLabel(rankedFilteredSpots[0].date_start)}
                               </span>
                             )}
 
@@ -2541,7 +2584,11 @@ export default function HomePage() {
                         </div>
 
                         <TagPills
-                          tags={dedupeChronologyTags(rankedFilteredSpots[0].tags, rankedFilteredSpots[0].date_start)}
+                          tags={dedupeChronologyTags(
+                            rankedFilteredSpots[0].tags,
+                            rankedFilteredSpots[0].date_start,
+                            rankedFilteredSpots[0].period_label_out
+                          )}
                           max={2}
                         />
 
@@ -2666,7 +2713,7 @@ export default function HomePage() {
                                 )}
 
                                 {formatStoryDate(s.date_start) && (() => {
-                                  const timeScale = classifyTimeScale(s.date_start);
+                                  const timeScale = effectiveTimeScale(s);
                                   const color = timeScale.color;
 
                                   return (
@@ -2687,8 +2734,8 @@ export default function HomePage() {
                                   );
                                 })()}
 
-                                {storyPeriodLabel(s.date_start) &&
-                                storyPeriodLabel(s.date_start) !== formatStoryDate(s.date_start) && (
+                                {(s.period_label_out ?? storyPeriodLabel(s.date_start)) &&
+                                  (s.period_label_out ?? storyPeriodLabel(s.date_start)) !== formatStoryDate(s.date_start) && (
                                   <span
                                     style={{
                                       padding: "4px 8px",
@@ -2700,7 +2747,7 @@ export default function HomePage() {
                                       border: "1px solid rgba(107,33,168,0.24)",
                                     }}
                                   >
-                                    {storyPeriodLabel(s.date_start)}
+                                    {s.period_label_out ?? storyPeriodLabel(s.date_start)}
                                   </span>
                                 )}
 
@@ -2742,7 +2789,7 @@ export default function HomePage() {
                                 {s.what3words ? `${s.distance_m ? " · " : ""}///${s.what3words}` : null}
                               </div>
 
-                              <TagPills tags={dedupeChronologyTags(s.tags, s.date_start)} max={3} />
+                              <TagPills tags={dedupeChronologyTags(s.tags, s.date_start, s.period_label_out)} max={3} />
                             </div>
 
                             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -3095,7 +3142,7 @@ export default function HomePage() {
                     </div>
 
                     <TagPills
-                      tags={dedupeChronologyTags(selected.tags, selected.date_start)}
+                      tags={dedupeChronologyTags(selected.tags, selected.date_start, selected.period_label_out)}
                       max={selectedSheetIsPeek ? 3 : 6}
                     />
                   </div>
