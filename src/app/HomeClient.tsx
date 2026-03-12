@@ -1,17 +1,21 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { GoogleMap, MarkerF, MarkerClustererF, useLoadScript } from "@react-google-maps/api";
+import { GoogleMap, useLoadScript } from "@react-google-maps/api";
 import { getSupabaseBrowser } from "@/lib/supabase/browser";
 import Link from "next/link";
+
 import AppShell from "@/components/AppShell";
+import NearbySheet from "@/components/map/NearbySheet";
+import FiltersSheet from "@/components/map/FiltersSheet";
+import MapView from "@/components/map/MapView";
+
+import type { Spot, SpotCategory } from "@/map/types";
 
 import {
   formatStoryDate,
-  classifyTimeScale,
   effectiveTimeScale,
   timeScaleKey,
-  geologicalPeriodFromMa,
   storyPeriodLabel,
   isModernHumanDate,
   eraKeyForSpot,
@@ -19,20 +23,14 @@ import {
   dedupeChronologyTags,
 } from "@/map/temporal";
 import { discoveryScore } from "@/map/discoveryRanking";
-
 import {
   buildClusterCalculator,
   clusterBubbleDataUrl,
-  clusterPaletteForScale,
-  markerTimeScaleFromIcon,
 } from "@/map/clusterStyles";
-
 import {
-  markerCoreColorForDate,
   markerIconForVisibility,
   markerIconForUser,
 } from "@/map/markerIcons";
-
 import {
   NEARBY_SHEET_SNAP,
   SPOT_SHEET_SNAP,
@@ -41,32 +39,10 @@ import {
   spotSheetHeightForSnap,
 } from "@/map/mapConfig";
 
-type Spot = {
-  id: string;
-  user_id: string;
-  title: string;
-  description: string;
-  category: string;
-  tags?: string[] | null;
-  photo_url: string | null;
-  photo_path: string | null;
-  what3words: string | null;
-  date_start: string | null;
-  source_url: string | null;
-  created_at: string;
-  visibility: "public" | "friends" | "private" | "group";
-  group_id: string | null;
-  distance_m: number;
-  lat_out: number;
-  lng_out: number;
-  is_imported: boolean;
-  time_scale_out?: "human" | "ancient" | "geological" | string | null;
-  period_label_out?: string | null;
-};
-
-type SpotCategory = { id: string; label: string };
-
 const CURRENT_ONBOARDING_VERSION = 1;
+
+const MAP_REFETCH_THRESHOLD_M = 150;
+const MAP_REFETCH_THROTTLE_MS = 350;
 
 const ONBOARDING_STEPS = [
   {
@@ -96,6 +72,7 @@ const ONBOARDING_STEPS = [
   },
 ] as const;
 
+// ---------- local formatting / utility helpers ----------
 function formatDistance(meters: number) {
   if (!Number.isFinite(meters)) return "";
   if (meters < 1000) return `${Math.round(meters)} m`;
@@ -106,12 +83,25 @@ function formatDistance(meters: number) {
   return `${Math.round(km)} km`;
 }
 
-function splitStory(description: string) {
-  const parts = description.trim().split(/(?<=[.!?])\s+/);
-  const intro = parts.slice(0, 2).join(" ").trim();
-  const rest = parts.slice(2).join(" ").trim();
-  return { intro, rest };
+function distanceMetersBetween(
+  a: { lat: number; lng: number },
+  b: { lat: number; lng: number }
+) {
+  const toRad = (v: number) => (v * Math.PI) / 180;
+  const R = 6371000;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+
+  const x =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+
+  const c = 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+  return R * c;
 }
+
 
 
 
@@ -240,8 +230,14 @@ function clamp<T extends number>(value: T, min: number, max: number) {
   return Math.max(min, Math.min(max, value)) as T;
 }
 
+function splitStory(description: string) {
+  const parts = description.trim().split(/(?<=[.!?])\s+/);
+  const intro = parts.slice(0, 2).join(" ").trim();
+  const rest = parts.slice(2).join(" ").trim();
+  return { intro, rest };
+}
 
-
+// ---------- page component ----------
 export default function HomePage() {
   const supabase = getSupabaseBrowser();
 
@@ -249,6 +245,7 @@ export default function HomePage() {
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
   });
 
+  // ---------- core app state ----------
   const [pos, setPos] = useState<{ lat: number; lng: number } | null>(null);
   const [spots, setSpots] = useState<Spot[]>([]);
   const [selected, setSelected] = useState<Spot | null>(null);
@@ -261,9 +258,12 @@ export default function HomePage() {
     lat: number;
     lng: number;
   } | null>(null);
+  const [queryCenter, setQueryCenter] = useState<{ lat: number; lng: number } | null>(null);
   const [crosshairPulseKey, setCrosshairPulseKey] = useState(0);
   const markerPulseTimeoutRef = useRef<number | null>(null);
   const mapPanTimeoutRef = useRef<number | null>(null);
+  const mapQueryThrottleTimeoutRef = useRef<number | null>(null);
+  const pendingMapCenterRef = useRef<{ lat: number; lng: number } | null>(null);
 
   function panSelectedSpotIntoView(lat: number, lng: number) {
     if (!map) return;
@@ -314,6 +314,7 @@ export default function HomePage() {
   const [spotSheetDragY, setSpotSheetDragY] = useState(0);
   // New filters
   const [searchText, setSearchText] = useState("");
+  const [debouncedSearchText, setDebouncedSearchText] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [visibilityFilter, setVisibilityFilter] = useState<string>("all");
   const [tagFilter, setTagFilter] = useState<string>("all");
@@ -331,6 +332,10 @@ export default function HomePage() {
   const [savingOnboarding, setSavingOnboarding] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState(0);
 
+  const [loadingSpots, setLoadingSpots] = useState(false);
+  const [spotsError, setSpotsError] = useState<string | null>(null);
+
+  // ---------- data loading / persistence effects ----------
   useEffect(() => {
     let cancelled = false;
 
@@ -405,6 +410,7 @@ export default function HomePage() {
     };
   }, [userId, supabase]);
 
+  // ---------- derived map / filter state ----------
   const filteredSpots = spots.filter((s) => {
     const catOk = categoryFilter === "all" || s.category === categoryFilter;
     const vis = (s as any).visibility ?? "public";
@@ -638,6 +644,7 @@ export default function HomePage() {
     },
   ];
 
+  // ---------- sheet / gesture handlers ----------
   function cycleMobileListSnap() {
     setMobileListSnap((prev) =>
       prev === "peek" ? "half" : prev === "half" ? "full" : "peek"
@@ -767,6 +774,7 @@ export default function HomePage() {
       ? `/add?lat=${pos.lat}&lng=${pos.lng}`
       : "/add";
 
+    // ---------- auth / user helpers ----------
     async function refreshAuthFlags() {
       try {
         const { data: sessionData } = await supabase.auth.getSession();
@@ -815,10 +823,46 @@ export default function HomePage() {
 
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
-      (p) => setPos({ lat: p.coords.latitude, lng: p.coords.longitude }),
-      () => setPos({ lat: 51.5074, lng: -0.1278 }), // fallback: London
+      (p) => {
+        const next = { lat: p.coords.latitude, lng: p.coords.longitude };
+        setPos(next);
+        setQueryCenter(next);
+      },
+      () => {
+        const fallback = { lat: 51.5074, lng: -0.1278 };
+        setPos(fallback);
+        setQueryCenter(fallback);
+      }, // fallback: London
     );
   }, []);
+  
+  // Throttle map-driven query recentering so tiny pan bursts do not spam refetches.
+  useEffect(() => {
+    if (!mapCenter) return;
+
+    const tryCommitMapCenter = () => {
+      const candidate = pendingMapCenterRef.current ?? mapCenter;
+
+      setQueryCenter((prev) => {
+        if (!prev) return candidate;
+        const moved = distanceMetersBetween(prev, candidate);
+        return moved >= MAP_REFETCH_THRESHOLD_M ? candidate : prev;
+      });
+
+      pendingMapCenterRef.current = null;
+      mapQueryThrottleTimeoutRef.current = null;
+    };
+
+    if (mapQueryThrottleTimeoutRef.current != null) {
+      pendingMapCenterRef.current = mapCenter;
+      return;
+    }
+
+    pendingMapCenterRef.current = mapCenter;
+    mapQueryThrottleTimeoutRef.current = window.setTimeout(() => {
+      tryCommitMapCenter();
+    }, MAP_REFETCH_THROTTLE_MS);
+  }, [mapCenter]);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 768px)");
@@ -842,6 +886,16 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedSearchText(searchText);
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [searchText]);
+
+  useEffect(() => {
     return () => {
       if (markerPulseTimeoutRef.current != null) {
         window.clearTimeout(markerPulseTimeoutRef.current);
@@ -849,26 +903,49 @@ export default function HomePage() {
       if (mapPanTimeoutRef.current != null) {
         window.clearTimeout(mapPanTimeoutRef.current);
       }
+      if (mapQueryThrottleTimeoutRef.current != null) {
+        window.clearTimeout(mapQueryThrottleTimeoutRef.current);
+      }
     };
   }, []);
 
   useEffect(() => {
-    if (!pos) return;
+    if (!queryCenter) return;
+
+    let cancelled = false;
+
     (async () => {
+      setLoadingSpots(true);
+      setSpotsError(null);
+
       const { data, error } = await supabase.rpc("spots_nearby", {
-        lat: pos.lat,
-        lng: pos.lng,
+        lat: queryCenter.lat,
+        lng: queryCenter.lng,
         radius_m: radiusM,
         category: categoryFilter === "all" ? null : categoryFilter,
         visibility: visibilityFilter === "all" ? null : visibilityFilter,
         time_filter: backendTimeFilterForEra(eraFilter),
         tag_filter: tagFilter === "all" ? null : tagFilter,
-        q: searchText.trim() ? searchText.trim() : null,
+        q: debouncedSearchText.trim() ? debouncedSearchText.trim() : null,
         imported_only: importedOnly,
       });
-      if (!error && data) setSpots(data as Spot[]);
+
+      if (cancelled) return;
+
+      if (error) {
+        setSpotsError(error.message);
+        setSpots([]);
+      } else {
+        setSpots((data ?? []) as Spot[]);
+      }
+
+      setLoadingSpots(false);
     })();
-  }, [pos, radiusM, categoryFilter, searchText, importedOnly, supabase, visibilityFilter, tagFilter, eraFilter]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [queryCenter, radiusM, categoryFilter, debouncedSearchText, importedOnly, supabase, visibilityFilter, tagFilter, eraFilter]);
 
   // Close on Escape
   useEffect(() => {
@@ -927,6 +1004,7 @@ export default function HomePage() {
 
   if (!isLoaded || !pos) return <div style={{ padding: 16 }}>Loading…</div>;
 
+  // ---------- spot actions ----------
   async function deleteSpot(spot: Spot) {
     const ok = window.confirm("Delete this Spot? This cannot be undone.");
     if (!ok) return;
@@ -1511,342 +1589,44 @@ export default function HomePage() {
         </div>
       )}
 
-      {showFilters && (
-        <div
-          className="ots-sheet-overlay"
-          onClick={() => setShowFilters(false)} // tap outside closes
-        >
-          <div
-            className="ots-sheet"
-            onClick={(e) => e.stopPropagation()}
-            onTouchStart={onFilterSheetTouchStart}
-            onTouchMove={onFilterSheetTouchMove}
-            onTouchEnd={onFilterSheetTouchEnd}
-            style={{
-              transform: filterSheetDragY ? `translateY(${filterSheetDragY}px)` : undefined,
-              transition: filterSheetDragY ? "none" : "transform 180ms ease",
-            }}
-          >
-            <div className="ots-sheet-handle" />
-
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: 12,
-              }}
-            >
-              <strong style={{ fontSize: 16, color: "#111" }}>Filters</strong>
-            </div>
-
-            <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
-              <div
-                className="ots-surface ots-surface--border"
-                style={{ padding: 12, display: "grid", gap: 12 }}
-              >
-                <div style={{ fontWeight: 800, color: "#111" }}>Find spots</div>
-
-                <label style={{ display: "grid", gap: 6 }}>
-                  <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Search</span>
-                  <input
-                    value={searchText}
-                    onChange={(e) => setSearchText(e.target.value)}
-                    placeholder="Title, description, what3words…"
-                    style={{
-                      padding: 10,
-                      borderRadius: 12,
-                      border: "1px solid rgba(0,0,0,0.2)",
-                    }}
-                  />
-                </label>
-              </div>
-
-              <div
-                className="ots-surface ots-surface--border"
-                style={{ padding: 12, display: "grid", gap: 12 }}
-              >
-                <div style={{ fontWeight: 800, color: "#111" }}>Narrow results</div>
-
-                <label style={{ display: "grid", gap: 6 }}>
-                  <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Category</span>
-                  <select
-                    value={categoryFilter}
-                    onChange={(e) => setCategoryFilter(e.target.value)}
-                    style={{
-                      padding: 10,
-                      borderRadius: 12,
-                      border: "1px solid rgba(0,0,0,0.2)",
-                      background: "white",
-                    }}
-                  >
-                    <option value="all">All categories</option>
-                    {(categoriesLoaded ? categories : []).map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label style={{ display: "grid", gap: 6 }}>
-                  <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Visibility</span>
-                  <select
-                    value={visibilityFilter}
-                    onChange={(e) => setVisibilityFilter(e.target.value)}
-                    style={{
-                      padding: 10,
-                      borderRadius: 12,
-                      border: "1px solid rgba(0,0,0,0.2)",
-                      background: "white",
-                    }}
-                  >
-                    <option value="all">All visibility</option>
-                    <option value="public">Public</option>
-                    <option value="friends">Friends</option>
-                    <option value="group">Group</option>
-                    <option value="private">Private</option>
-                  </select>
-                </label>
-
-                <label style={{ display: "grid", gap: 6 }}>
-                  <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Era</span>
-                  <select
-                    value={eraFilter}
-                    onChange={(e) => setEraFilter(e.target.value as any)}
-                    style={{
-                      padding: 10,
-                      borderRadius: 12,
-                      border: "1px solid rgba(0,0,0,0.2)",
-                      background: "white",
-                    }}
-                  >
-                    <option value="all">All time</option>
-                    <option value="modern">Modern</option>
-                    <option value="human">Human history</option>
-                    <option value="prehistoric">Prehistory</option>
-                    <option value="geological">Geological</option>
-                  </select>
-                </label>
-
-                {availableTags.length > 0 && (
-                  <div style={{ display: "grid", gap: 6 }}>
-                    <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Tag</span>
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      <button
-                        type="button"
-                        className="ots-btn"
-                        onClick={() => setTagFilter("all")}
-                        style={{
-                          padding: "6px 10px",
-                          borderRadius: 999,
-                          fontWeight: tagFilter === "all" ? 800 : 700,
-                          background: tagFilter === "all" ? "rgba(0,255,251,0.16)" : "white",
-                        }}
-                      >
-                        All tags
-                      </button>
-                      {availableTags.map((tag) => (
-                        <button
-                          key={tag}
-                          type="button"
-                          className="ots-btn"
-                          onClick={() => setTagFilter(tag)}
-                          style={{
-                            padding: "6px 10px",
-                            borderRadius: 999,
-                            fontWeight: tagFilter === tag ? 800 : 700,
-                            background: tagFilter === tag ? "rgba(0,255,251,0.16)" : "white",
-                          }}
-                        >
-                          #{tag}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <label style={{ display: "grid", gap: 6 }}>
-                  <span style={{ fontSize: 13, color: "#333", fontWeight: 700 }}>Radius</span>
-                  <select
-                    value={radiusM}
-                    onChange={(e) => setRadiusM(Number(e.target.value))}
-                    style={{
-                      padding: 10,
-                      borderRadius: 12,
-                      border: "1px solid rgba(0,0,0,0.2)",
-                      background: "white",
-                    }}
-                  >
-                    <option value={1000}>1 km</option>
-                    <option value={2500}>2.5 km</option>
-                    <option value={5000}>5 km</option>
-                    <option value={10000}>10 km</option>
-                    <option value={100000}>100 km</option>
-                    <option value={250000}>250 km</option>
-                    <option value={500000}>500 km</option>
-                    <option value={1000000}>1000 km</option>
-                  </select>
-                </label>
-
-                <label
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 12,
-                    padding: 10,
-                    borderRadius: 12,
-                    border: "1px solid rgba(0,0,0,0.08)",
-                    background: "rgba(0,0,0,0.02)",
-                  }}
-                >
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: "#111" }}>Imported only</div>
-                    <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>
-                      Show only imported spots
-                    </div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={importedOnly}
-                    onChange={(e) => setImportedOnly(e.target.checked)}
-                    style={{ width: 18, height: 18 }}
-                  />
-                </label>
-              </div>
-
-              <div
-                className="ots-surface ots-surface--border"
-                style={{ padding: 12, display: "grid", gap: 10 }}
-              >
-                <div style={{ fontWeight: 800, color: "#111" }}>Quick actions</div>
-
-                {isAdmin && (
-                  <div style={{ display: "grid", gap: 10 }}>
-                    <Link
-                      href="/admin/users"
-                      onClick={() => setShowFilters(false)}
-                      style={{
-                        display: "block",
-                        textAlign: "center",
-                        padding: 12,
-                        borderRadius: 12,
-                        border: "1px solid rgba(0,0,0,0.2)",
-                        background: "white",
-                        textDecoration: "none",
-                        color: "#111",
-                        fontWeight: 700,
-                      }}
-                    >
-                      Admin: Users
-                    </Link>
-
-                    <Link
-                      href="/admin/submissions"
-                      onClick={() => setShowFilters(false)}
-                      style={{
-                        display: "block",
-                        textAlign: "center",
-                        padding: 12,
-                        borderRadius: 12,
-                        border: "1px solid rgba(0,0,0,0.2)",
-                        background: "white",
-                        textDecoration: "none",
-                        color: "#111",
-                        fontWeight: 700,
-                      }}
-                    >
-                      Admin: Submissions
-                    </Link>
-                  </div>
-                )}
-
-                <Link
-                  href={addHref}
-                  onClick={() => setShowFilters(false)}
-                  style={{
-                    display: "block",
-                    textAlign: "center",
-                    padding: 12,
-                    borderRadius: 12,
-                    border: "1px solid rgba(0,0,0,0.2)",
-                    background: "white",
-                    textDecoration: "none",
-                    color: "#111",
-                    fontWeight: 700,
-                  }}
-                >
-                  + Add Spot
-                </Link>
-
-                <Link
-                  href="/account"
-                  onClick={() => setShowFilters(false)}
-                  style={{
-                    display: "block",
-                    textAlign: "center",
-                    padding: 12,
-                    borderRadius: 12,
-                    border: "1px solid rgba(0,0,0,0.2)",
-                    background: "white",
-                    textDecoration: "none",
-                    color: "#111",
-                    fontWeight: 700,
-                  }}
-                >
-                  Account
-                </Link>
-
-                <form action="/auth/logout" method="post">
-                  <button
-                    type="submit"
-                    style={{
-                      width: "100%",
-                      padding: 12,
-                      borderRadius: 12,
-                      border: "1px solid rgba(0,0,0,0.2)",
-                      background: "white",
-                      cursor: "pointer",
-                      fontWeight: 700,
-                    }}
-                  >
-                    Log out
-                  </button>
-                </form>
-              </div>
-
-              <div style={{ display: "flex", gap: 10 }}>
-                <button
-                  type="button"
-                  className="ots-btn"
-                  onClick={() => {
-                    setSearchText("");
-                    setCategoryFilter("all");
-                    setVisibilityFilter("all");
-                    setTagFilter("all");
-                    setEraFilter("all");
-                    setImportedOnly(false);
-                    setRadiusM(2500);
-                  }}
-                  style={{ flex: 1, fontWeight: 700 }}
-                >
-                  Reset filters
-                </button>
-
-                <button
-                  type="button"
-                  className="ots-btn"
-                  onClick={() => setShowFilters(false)}
-                  style={{ flex: 1, fontWeight: 800 }}
-                >
-                  Show results
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <FiltersSheet
+        showFilters={showFilters}
+        isMobile={isMobile}
+        filterSheetDragY={filterSheetDragY}
+        searchText={searchText}
+        setSearchText={setSearchText}
+        categoryFilter={categoryFilter}
+        setCategoryFilter={setCategoryFilter}
+        visibilityFilter={visibilityFilter}
+        setVisibilityFilter={setVisibilityFilter}
+        eraFilter={eraFilter}
+        setEraFilter={setEraFilter}
+        tagFilter={tagFilter}
+        setTagFilter={setTagFilter}
+        radiusM={radiusM}
+        setRadiusM={setRadiusM}
+        importedOnly={importedOnly}
+        setImportedOnly={setImportedOnly}
+        availableTags={availableTags}
+        categoriesLoaded={categoriesLoaded}
+        categories={categories}
+        isAdmin={isAdmin}
+        addHref={addHref}
+        onClose={() => setShowFilters(false)}
+        onOverlayClose={() => setShowFilters(false)}
+        onTouchStart={onFilterSheetTouchStart}
+        onTouchMove={onFilterSheetTouchMove}
+        onTouchEnd={onFilterSheetTouchEnd}
+        onResetFilters={() => {
+          setSearchText("");
+          setCategoryFilter("all");
+          setVisibilityFilter("all");
+          setEraFilter("all");
+          setTagFilter("all");
+          setImportedOnly(false);
+          setRadiusM(2500);
+        }}
+      />
 
       {/* MAIN CONTENT */}
       <div style={{ height: "100%", display: "flex", minHeight: 0, flexDirection: "column" }}>
@@ -1962,1012 +1742,91 @@ export default function HomePage() {
           }}
         >
           {/* Nearby list: desktop sidebar, mobile bottom sheet */}
-            <aside
-              className="ots-list ots-surface ots-surface--border"
-              onTouchStart={onMobileListTouchStart}
-              onTouchMove={onMobileListTouchMove}
-              onTouchEnd={onMobileListTouchEnd}
-              style={
-                isMobile
-                  ? {
-                      position: "absolute",
-                      left: 8,
-                      right: 8,
-                      bottom: 8,
-                      zIndex: 20,
-                      height: isMobile
-                        ? `min(calc(100vh - 24px), ${Math.max(NEARBY_SHEET_SNAP.peek, mobileListHeightForSnap() - mobileListDragY)}px)`
-                        : undefined,
-                      borderRadius: 16,
-                      boxShadow: "0 16px 40px rgba(0,0,0,0.22)",
-                      overflow: "hidden",
-                      background: "white",
-                      transition: mobileListDragY ? "none" : "height 320ms cubic-bezier(0.16, 1, 0.3, 1)",
-                      willChange: "height",
-                    }
-                  : undefined
-              }
-            >
-              <div
-                style={{
-                  display: "grid",
-                  gap: 8,
-                  marginBottom: isMobile && mobileListSnap === "peek" ? 0 : 10,
-                  position: isMobile ? "sticky" : undefined,
-                  top: isMobile ? 0 : undefined,
-                  background: isMobile ? "white" : undefined,
-                  paddingTop: isMobile ? 4 : undefined,
-                  zIndex: isMobile ? 1 : undefined,
-                  cursor: isMobile ? "pointer" : undefined,
-                }}
-                onClick={isMobile ? cycleMobileListSnap : undefined}
-              >
-                {isMobile && (
-                  <div
-                    style={{
-                      width: 40,
-                      height: 4,
-                      borderRadius: 999,
-                      background: "rgba(0,0,0,0.18)",
-                      margin: "0 auto",
-                    }}
-                  />
-                )}
+            <NearbySheet
+              isMobile={isMobile}
+              mobileListSnap={mobileListSnap}
+              mobileListExpanded={mobileListExpanded}
+              mobileListDragY={mobileListDragY}
 
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    gap: 10,
-                  }}
-                >
-                  <div>
-                    <h3 className="ots-brand-heading">
-                      Nearby Spots
-                    </h3>
-                    {isMobile && (
-                      <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
-                        {rankedFilteredSpots.length} found nearby {mobileListSnap === "peek" ? "• tap to expand" : mobileListSnap === "half" ? "• tap for full list" : ""}
-                      </div>
-                    )}
-                  </div>
+              onMobileListTouchStart={onMobileListTouchStart}
+              onMobileListTouchMove={onMobileListTouchMove}
+              onMobileListTouchEnd={onMobileListTouchEnd}
+              onCycleMobileListSnap={cycleMobileListSnap}
 
-                  {isMobile && (
-                    <button
-                      type="button"
-                      className="ots-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        cycleMobileListSnap();
-                      }}
-                      style={{ padding: "8px 10px", borderRadius: 999 }}
-                    >
-                      {mobileListSnap === "peek" ? "Show" : mobileListSnap === "half" ? "Full" : "Hide"}
-                    </button>
-                  )}
-                </div>
+              rankedFilteredSpots={rankedFilteredSpots}
+              selectedSpotId={selected?.id ?? null}
+              userId={userId}
 
-                {isMobile && mobileListSnap === "peek" && rankedFilteredSpots.length > 0 && (
-                  <div
-                    className="ots-surface ots-surface--border"
-                    style={{
-                      padding: 10,
-                      borderRadius: 12,
-                      display: "grid",
-                      gap: 6,
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        gap: 8,
-                        alignItems: "start",
-                      }}
-                    >
-                      <div style={{ minWidth: 0, display: "grid", gap: 6 }}>
-                        <div
-                          className="ots-brand-heading"
-                          style={{ fontWeight: 900, color: "#111", lineHeight: 1.15, fontSize: 16 }}
-                        >
-                          {rankedFilteredSpots[0].title}
-                        </div>
+              loadingSpots={loadingSpots}
+              spotsError={spotsError}
 
-                        <div
-                          style={{
-                            display: "flex",
-                            gap: 6,
-                            flexWrap: "wrap",
-                            alignItems: "center",
-                          }}
-                        >
-                          {formatStoryDate(rankedFilteredSpots[0].date_start) && (() => {
-                            const timeScale = effectiveTimeScale(rankedFilteredSpots[0]);
-                            const color = timeScale.color;
+              addHref={addHref}
 
-                            return (
-                              <span
-                                style={{
-                                  padding: "3px 8px",
-                                  borderRadius: 999,
-                                  fontSize: 11,
-                                  fontWeight: 700,
-                                  color: "#0F2A44",
-                                  background: `${color}20`,
-                                  border: `1px solid ${color}55`,
-                                }}
-                                title={`${timeScale.scale} timescale`}
-                              >
-                                {formatStoryDate(rankedFilteredSpots[0].date_start)}
-                              </span>
-                            );
-                          })()}
+              onSelectSpot={selectSpot}
+              onDeleteSpot={deleteSpot}
 
-                          {(rankedFilteredSpots[0].period_label_out ?? storyPeriodLabel(rankedFilteredSpots[0].date_start)) &&
-                            (rankedFilteredSpots[0].period_label_out ?? storyPeriodLabel(rankedFilteredSpots[0].date_start)) !== formatStoryDate(rankedFilteredSpots[0].date_start) && (
-                              <span
-                                style={{
-                                  padding: "3px 8px",
-                                  borderRadius: 999,
-                                  fontSize: 11,
-                                  fontWeight: 700,
-                                  color: "#0F2A44",
-                                  background: "rgba(107,33,168,0.10)",
-                                  border: "1px solid rgba(107,33,168,0.24)",
-                                }}
-                              >
-                                {rankedFilteredSpots[0].period_label_out ?? storyPeriodLabel(rankedFilteredSpots[0].date_start)}
-                              </span>
-                            )}
+              nearbySheetPeekMinHeight={NEARBY_SHEET_SNAP.peek}
+              mobileListHeightForSnap={mobileListHeightForSnap}
 
-                          {sourceBadgeLabel(rankedFilteredSpots[0].source_url) && (
-                            <span
-                              style={{
-                                padding: "3px 8px",
-                                borderRadius: 999,
-                                fontSize: 11,
-                                fontWeight: 700,
-                                color: "#0F2A44",
-                                background: "rgba(31,182,166,0.10)",
-                                border: "1px solid rgba(31,182,166,0.24)",
-                              }}
-                            >
-                              {sourceBadgeLabel(rankedFilteredSpots[0].source_url)}
-                            </span>
-                          )}
-                        </div>
+              formatDistance={formatDistance}
+              formatStoryDate={formatStoryDate}
+              storyPeriodLabel={storyPeriodLabel}
+              effectiveTimeScale={effectiveTimeScale}
+              sourceBadgeLabel={sourceBadgeLabel}
+              visibilityStoryLabel={visibilityStoryLabel}
+              dedupeChronologyTags={dedupeChronologyTags}
 
-                        <TagPills
-                          tags={dedupeChronologyTags(
-                            rankedFilteredSpots[0].tags,
-                            rankedFilteredSpots[0].date_start,
-                            rankedFilteredSpots[0].period_label_out
-                          )}
-                          max={2}
-                        />
-
-                        <div style={{ fontSize: 12, opacity: 0.7, marginTop: 2 }}>
-                          {rankedFilteredSpots[0].what3words
-                            ? `///${rankedFilteredSpots[0].what3words}`
-                            : "Tap to browse nearby stories"}
-                        </div>
-                      </div>
-
-                      <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.8, whiteSpace: "nowrap" }}>
-                        {formatDistance(rankedFilteredSpots[0].distance_m)}
-                      </div>
-                    </div>
-
-                    <div
-                      className="ots-story-text"
-                      style={{
-                        fontSize: 13,
-                        opacity: 0.8,
-                        display: "-webkit-box",
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: "vertical",
-                        overflow: "hidden",
-                        lineHeight: 1.35,
-                      }}
-                    >
-                      {rankedFilteredSpots[0].description}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {(!isMobile || mobileListExpanded) && (
-                <div
-                  style={{
-                    overflowY: "auto",
-                    maxHeight: isMobile
-                      ? mobileListSnap === "half"
-                        ? "calc(38vh - 56px)"
-                        : "calc(72vh - 56px)"
-                      : undefined,
-                  }}
-                >
-                  {filteredSpots.length === 0 ? (
-                    <p style={{ opacity: 0.7 }}>No Spots found with these filters.</p>
-                  ) : (
-                    <div style={{ display: "grid", gap: 10 }}>
-                      {rankedFilteredSpots.map((s) => (
-                        <div
-                          key={s.id}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => selectSpot(s)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              selectSpot(s);
-                            }
-                          }}
-                          style={{
-                            textAlign: "left",
-                            padding: 12,
-                            borderRadius: 14,
-                            border:
-                              selected?.id === s.id
-                                ? "2px solid black"
-                                : "1px solid rgba(0,0,0,0.10)",
-                            background:
-                              selected?.id === s.id ? "rgba(0,0,0,0.05)" : "white",
-                            cursor: "pointer",
-                            boxShadow:
-                              selected?.id === s.id
-                                ? "0 8px 24px rgba(0,0,0,0.10)"
-                                : "0 2px 10px rgba(0,0,0,0.04)",
-                            transition:
-                              "transform 140ms ease, box-shadow 180ms ease, background 180ms ease, border-color 180ms ease",
-                            WebkitTapHighlightColor: "transparent",
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              gap: 10,
-                              alignItems: "start",
-                            }}
-                          >
-                            <div style={{ minWidth: 0, flex: 1, display: "grid", gap: 8 }}>
-                              <div style={{ display: "flex", gap: 8, alignItems: "center", minWidth: 0, flexWrap: "wrap" }}>
-                                <strong
-                                  className="ots-brand-heading"
-                                  style={{ lineHeight: 1.15, fontSize: 16, color: "#111" }}
-                                >
-                                  {s.title}
-                                </strong>
-                                <VisibilityBadge visibility={s.visibility} />
-                              </div>
-
-                              <div
-                                style={{
-                                  display: "flex",
-                                  gap: 8,
-                                  flexWrap: "wrap",
-                                  alignItems: "center",
-                                }}
-                              >
-                                {visibilityStoryLabel(s.visibility) && s.visibility !== "public" && (
-                                  <span
-                                    style={{
-                                      padding: "4px 8px",
-                                      borderRadius: 999,
-                                      fontSize: 12,
-                                      fontWeight: 700,
-                                      color: "#0F2A44",
-                                      background: "rgba(15,42,68,0.05)",
-                                      border: "1px solid rgba(15,42,68,0.08)",
-                                    }}
-                                  >
-                                    {visibilityStoryLabel(s.visibility)}
-                                  </span>
-                                )}
-
-                                {formatStoryDate(s.date_start) && (() => {
-                                  const timeScale = effectiveTimeScale(s);
-                                  const color = timeScale.color;
-
-                                  return (
-                                    <span
-                                      style={{
-                                        padding: "4px 8px",
-                                        borderRadius: 999,
-                                        fontSize: 12,
-                                        fontWeight: 700,
-                                        color: "#0F2A44",
-                                        background: `${color}20`,
-                                        border: `1px solid ${color}55`,
-                                      }}
-                                      title={`${timeScale.scale} timescale`}
-                                    >
-                                      {formatStoryDate(s.date_start)}
-                                    </span>
-                                  );
-                                })()}
-
-                                {(s.period_label_out ?? storyPeriodLabel(s.date_start)) &&
-                                  (s.period_label_out ?? storyPeriodLabel(s.date_start)) !== formatStoryDate(s.date_start) && (
-                                  <span
-                                    style={{
-                                      padding: "4px 8px",
-                                      borderRadius: 999,
-                                      fontSize: 12,
-                                      fontWeight: 700,
-                                      color: "#0F2A44",
-                                      background: "rgba(107,33,168,0.10)",
-                                      border: "1px solid rgba(107,33,168,0.24)",
-                                    }}
-                                  >
-                                    {s.period_label_out ?? storyPeriodLabel(s.date_start)}
-                                  </span>
-                                )}
-
-                                {sourceBadgeLabel(s.source_url) && (
-                                  <span
-                                    style={{
-                                      padding: "4px 8px",
-                                      borderRadius: 999,
-                                      fontSize: 12,
-                                      fontWeight: 700,
-                                      color: "#0F2A44",
-                                      background: "rgba(31,182,166,0.10)",
-                                      border: "1px solid rgba(31,182,166,0.24)",
-                                    }}
-                                  >
-                                    {sourceBadgeLabel(s.source_url)}
-                                  </span>
-                                )}
-                              </div>
-
-                              <div className="ots-story-text" style={{ opacity: 0.78, fontSize: 13, lineHeight: 1.45 }}>
-                                {s.distance_m ? `${formatDistance(s.distance_m)} away` : null}
-                                {s.what3words ? `${s.distance_m ? " · " : ""}///${s.what3words}` : null}
-                              </div>
-
-                              <TagPills tags={dedupeChronologyTags(s.tags, s.date_start, s.period_label_out)} max={3} />
-                            </div>
-
-                            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                              {userId && s.user_id === userId && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    deleteSpot(s);
-                                  }}
-                                  style={{
-                                    padding: "4px 8px",
-                                    borderRadius: 999,
-                                    border: "1px solid rgba(0,0,0,0.2)",
-                                    background: "white",
-                                    cursor: "pointer",
-                                  }}
-                                  title="Delete this Spot"
-                                >
-                                  Delete
-                                </button>
-                              )}
-                            </div>
-                          </div>
-
-                          <div
-                            className="ots-story-text"
-                            style={{
-                              marginTop: 10,
-                              color: "#1f2937",
-                              lineHeight: 1.5,
-                              display: "-webkit-box",
-                              WebkitLineClamp: 3,
-                              WebkitBoxOrient: "vertical",
-                              overflow: "hidden",
-                              fontSize: 14,
-                            }}
-                          >
-                            {splitStory(s.description).intro || s.description}
-                          </div>
-
-                          <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                            <a
-                              href={`https://www.google.com/maps/dir/?api=1&destination=${s.lat_out},${s.lng_out}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: 6,
-                                padding: "7px 10px",
-                                borderRadius: 999,
-                                border: "1px solid rgba(0,0,0,0.14)",
-                                textDecoration: "none",
-                                color: "#111",
-                                fontWeight: 700,
-                                background: "rgba(0,255,251,0.10)",
-                              }}
-                            >
-                              📍 Navigate
-                            </a>
-
-                            {s.source_url && (
-                              <a
-                                href={s.source_url}
-                                target="_blank"
-                                rel="noreferrer"
-                                onClick={(e) => e.stopPropagation()}
-                                style={{
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: 6,
-                                  padding: "7px 10px",
-                                  borderRadius: 999,
-                                  border: "1px solid rgba(0,0,0,0.14)",
-                                  textDecoration: "none",
-                                  color: "#111",
-                                  fontWeight: 700,
-                                  background: "white",
-                                }}
-                              >
-                                Source
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {!isMobile && (
-                    <div style={{ marginTop: 12 }}>
-                      <Link
-                        href={addHref}
-                        style={{
-                          display: "block",
-                          textAlign: "center",
-                          padding: 12,
-                          borderRadius: 12,
-                          border: "1px solid rgba(0,0,0,0.2)",
-                          background: "white",
-                          textDecoration: "none",
-                          color: "#111",
-                        }}
-                      >
-                        + Add Spot
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              )}
-            </aside>
+              VisibilityBadge={VisibilityBadge}
+              TagPills={TagPills}
+            />
           
 
           {/* Right panel: Map */}
-          <div className="ots-map">
-            <GoogleMap
-              mapContainerStyle={{ width: "100%", height: "100%" }}
-              center={pos}
-              zoom={14}
-              options={{ streetViewControl: false, mapTypeControl: false }}
-              onLoad={(m) => {
-                setMap(m);
-                const c = m.getCenter();
-                if (c) setMapCenter({ lat: c.lat(), lng: c.lng() });
-              }}
-              onIdle={() => {
-                if (!map) return;
-                const c = map.getCenter();
-                if (c) setMapCenter({ lat: c.lat(), lng: c.lng() });
-                setCrosshairPulseKey((k) => k + 1);
-              }}
-              onClick={() => setSelected(null)}
-            >
-              <MarkerF position={pos} title="You" icon={markerIconForUser()} zIndex={1100} />
-
-              {shouldClusterMarkers ? (
-                <>
-                  {temporalClusterGroups.map((group) => (
-                    <MarkerClustererF
-                      key={group.key}
-                      options={{
-                        minimumClusterSize: 2,
-                        gridSize: eraFilter === "all" ? (isMobile ? 38 : 48) : (isMobile ? 44 : 56),
-                        maxZoom: eraFilter === "all" ? 15 : 16,
-                        styles: clusterStyles,
-                        clusterClass: "ots-map-cluster",
-                        calculator: clusterCalculator,
-                      }}
-                    >
-                      {(clusterer) => (
-                        <>
-                          {group.spots.map((s) => (
-                            <MarkerF
-                              key={s.id}
-                              clusterer={selected?.id === s.id ? undefined : clusterer}
-                              position={{ lat: s.lat_out, lng: s.lng_out }}
-                              title={s.title}
-                              icon={markerIconForVisibility(
-                                (s as any).visibility,
-                                s,
-                                selected?.id === s.id,
-                                pulsingMarkerId === s.id
-                              )}
-                              zIndex={selected?.id === s.id ? 1000 : undefined}
-                              onClick={() => {
-                                selectSpot(s);
-                              }}
-                            />
-                          ))}
-                        </>
-                      )}
-                    </MarkerClustererF>
-                  ))}
-                </>
-              ) : (
-                rankedFilteredSpots.map((s) => (
-                  <MarkerF
-                    key={s.id}
-                    position={{ lat: s.lat_out, lng: s.lng_out }}
-                    title={s.title}
-                    icon={markerIconForVisibility(
-                      (s as any).visibility,
-                      s,
-                      selected?.id === s.id,
-                      pulsingMarkerId === s.id
-                    )}
-                    zIndex={selected?.id === s.id ? 1000 : undefined}
-                    onClick={() => {
-                      selectSpot(s);
-                    }}
-                  />
-                ))
-              )}
-            </GoogleMap>
-
-            {!selected && (
-              <div
-                key={crosshairPulseKey}
-                className="ots-crosshair ots-crosshair--pulse"
-              />
-            )}
-
-            {selected && (
-              <div
-                className="ots-surface ots-surface--shadow"
-                onTouchStart={onSpotSheetTouchStart}
-                onTouchMove={onSpotSheetTouchMove}
-                onTouchEnd={onSpotSheetTouchEnd}
-                style={{
-                  position: "absolute",
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  backdropFilter: "blur(10px)",
-                  borderTopLeftRadius: 18,
-                  borderTopRightRadius: 18,
-                  padding: 16,
-                  height: `min(calc(100vh - 24px), ${Math.max(SPOT_SHEET_SNAP.peek, selectedSheetHeightForSnap() - spotSheetDragY)}px)`,
-                  overflowY: "auto",
-                  boxShadow: "0 -10px 40px rgba(0,0,0,0.25)",
-                  transform: undefined,
-                  transition: spotSheetDragY ? "none" : "height 320ms cubic-bezier(0.16, 1, 0.3, 1)",
-                  willChange: "height",
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={cycleSelectedSheetSnap}
-                  aria-label="Resize details sheet"
-                  style={{
-                    display: "block",
-                    width: 44,
-                    height: 12,
-                    padding: 0,
-                    border: "none",
-                    background: "transparent",
-                    margin: "0 auto 12px auto",
-                    cursor: "pointer",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 40,
-                      height: 4,
-                      borderRadius: 999,
-                      background: "rgba(0,0,0,0.2)",
-                      margin: "4px auto 0 auto",
-                    }}
-                  />
-                </button>
-
-                                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: 12,
-                    alignItems: "start",
-                  }}
-                >
-                  <div style={{ minWidth: 0, flex: 1, display: "grid", gap: 10 }}>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center", minWidth: 0, flexWrap: "wrap" }}>
-                      <h3
-                        className="ots-brand-heading"
-                        style={{
-                          margin: 0,
-                          fontSize: selectedSheetIsPeek ? 18 : 26,
-                          lineHeight: 1.12,
-                        }}
-                      >
-                        {selected.title}
-                      </h3>
-                      <VisibilityBadge visibility={selected.visibility} />
-                    </div>
-
-                    {!selectedSheetIsPeek && (
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: 8,
-                          flexWrap: "wrap",
-                          alignItems: "center",
-                        }}
-                      >
-                        {selectedStoryDate && (
-                          <span
-                            style={{
-                              padding: "4px 8px",
-                              borderRadius: 999,
-                              fontSize: 12,
-                              fontWeight: 700,
-                              color: "#0F2A44",
-                              background: "rgba(230,179,37,0.10)",
-                              border: "1px solid rgba(230,179,37,0.22)",
-                            }}
-                          >
-                            {selectedStoryDate}
-                          </span>
-                        )}
-
-                        {selectedStoryPeriod && selectedStoryPeriod !== selectedStoryDate && (
-                          <span
-                            style={{
-                              padding: "4px 8px",
-                              borderRadius: 999,
-                              fontSize: 12,
-                              fontWeight: 700,
-                              color: "#0F2A44",
-                              background: "rgba(107,33,168,0.10)",
-                              border: "1px solid rgba(107,33,168,0.24)",
-                            }}
-                          >
-                            {selectedStoryPeriod}
-                          </span>
-                        )}
-
-                        {selectedVisibilityLabel && (
-                          <span
-                            style={{
-                              padding: "4px 8px",
-                              borderRadius: 999,
-                              fontSize: 12,
-                              fontWeight: 700,
-                              color: "#0F2A44",
-                              background: "rgba(15,42,68,0.05)",
-                              border: "1px solid rgba(15,42,68,0.08)",
-                            }}
-                          >
-                            {selectedVisibilityLabel}
-                          </span>
-                        )}
-
-                        {selectedSourceBadge && (
-                          <span
-                            style={{
-                              padding: "4px 8px",
-                              borderRadius: 999,
-                              fontSize: 12,
-                              fontWeight: 700,
-                              color: "#0F2A44",
-                              background: "rgba(31,182,166,0.10)",
-                              border: "1px solid rgba(31,182,166,0.24)",
-                            }}
-                          >
-                            {selectedSourceBadge}
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    <div className="ots-story-text" style={{ opacity: 0.82, fontSize: 14, lineHeight: 1.5 }}>
-                      {selected.distance_m ? `${formatDistance(selected.distance_m)} away` : null}
-                      {selected.what3words ? `${selected.distance_m ? " · " : ""}///${selected.what3words}` : null}
-                    </div>
-
-                    <TagPills
-                      tags={dedupeChronologyTags(selected.tags, selected.date_start, selected.period_label_out)}
-                      max={selectedSheetIsPeek ? 3 : 6}
-                    />
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setSelected(null)}
-                    style={{
-                      border: "none",
-                      background: "transparent",
-                      fontSize: 18,
-                      cursor: "pointer",
-                    }}
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
-                  <a
-                    href={`https://www.google.com/maps/dir/?api=1&destination=${selected.lat_out},${selected.lng_out}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{
-                      padding: "8px 12px",
-                      borderRadius: 999,
-                      border: "1px solid rgba(0,0,0,0.2)",
-                      textDecoration: "none",
-                      color: "#111",
-                      fontWeight: 700,
-                    }}
-                  >
-                    Navigate
-                  </a>
-
-                  {!selectedSheetIsPeek && selected.source_url && (
-                    <a
-                      href={selected.source_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{
-                        padding: "8px 12px",
-                        borderRadius: 999,
-                        border: "1px solid rgba(0,0,0,0.2)",
-                        textDecoration: "none",
-                        color: "#111",
-                        fontWeight: 700,
-                      }}
-                    >
-                      View source
-                    </a>
-                  )}
-                </div>
-
-                {!selectedSheetIsPeek && selected.photo_url && (
-                  <img
-                    src={selected.photo_url}
-                    alt={selected.title}
-                    style={{
-                      width: "100%",
-                      borderRadius: 14,
-                      marginTop: 14,
-                      maxHeight: selectedSheetIsHalf ? 200 : 280,
-                      objectFit: "cover",
-                    }}
-                  />
-                )}
-
-                {!selectedSheetIsPeek && (
-                  <div style={{ marginTop: 14, display: "grid", gap: 12 }}>
-                    <div
-                      className="ots-brand-heading"
-                      style={{ fontSize: 12, opacity: 0.68, letterSpacing: "0.02em" }}
-                    >
-                      Story
-                    </div>
-
-                    <p
-                      className="ots-story-text"
-                      style={{
-                        marginTop: 0,
-                        marginBottom: 0,
-                        fontSize: selectedSheetIsHalf ? 17 : 18,
-                        lineHeight: 1.68,
-                        color: "#1f2937",
-                      }}
-                    >
-                      {selectedSheetIsHalf && selectedStoryParts?.intro && selectedStoryParts.intro.length > 260
-                        ? selectedStoryParts.intro.slice(0, 260) + "…"
-                        : selectedStoryParts?.intro ?? ""}
-                    </p>
-
-                    {selectedSheetIsFull && selectedStoryParts?.rest && (
-                      <p
-                        className="ots-story-text"
-                        style={{
-                          marginTop: 0,
-                          marginBottom: 0,
-                          opacity: 0.94,
-                          lineHeight: 1.78,
-                          color: "#374151",
-                        }}
-                      >
-                        {selectedStoryParts.rest}
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {!selectedSheetIsPeek && placeThroughTimeSpots.length > 0 && (
-                  <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
-                    <div
-                      className="ots-brand-heading"
-                      style={{ fontSize: 12, opacity: 0.68, letterSpacing: "0.02em" }}
-                    >
-                      This place through time
-                    </div>
-
-                    <div style={{ display: "grid", gap: 8 }}>
-                      {placeThroughTimeSpots.map((s, index) => {
-                        const timeScale = effectiveTimeScale(s);
-                        const previous = placeThroughTimeSpots[index - 1];
-                        const storyDate = formatStoryDate(s.date_start);
-                        const storyPeriod = s.period_label_out ?? storyPeriodLabel(s.date_start);
-                        
-                        const showEraDivider =
-                          !previous || placeThroughTimeEraLabel(previous) !== placeThroughTimeEraLabel(s);
-                        return (
-                          <div key={s.id} style={{ display: "grid", gap: 6 }}>
-                            {showEraDivider && (
-                              <div
-                                className="ots-brand-heading"
-                                style={{
-                                  fontSize: 11,
-                                  letterSpacing: "0.04em",
-                                  textTransform: "uppercase",
-                                  color: "#6b7280",
-                                  paddingTop: index === 0 ? 0 : 6,
-                                }}
-                              >
-                                {placeThroughTimeEraLabel(s)}
-                              </div>
-                            )}
-
-                            <button
-                              type="button"
-                              onClick={() => selectSpot(s)}
-                              className="ots-surface ots-surface--border"
-                              style={{
-                                padding: 10,
-                                display: "grid",
-                                gap: 8,
-                                textAlign: "left",
-                                cursor: "pointer",
-                                background: "white",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  display: "flex",
-                                  justifyContent: "space-between",
-                                  alignItems: "start",
-                                  gap: 10,
-                                }}
-                              >
-                                <div style={{ minWidth: 0, display: "grid", gap: 6 }}>
-                                  <div
-                                    className="ots-brand-heading"
-                                    style={{ fontSize: 15, lineHeight: 1.2, color: "#111" }}
-                                  >
-                                    {s.title}
-                                  </div>
-
-                                  <div
-                                    style={{
-                                      display: "flex",
-                                      gap: 6,
-                                      flexWrap: "wrap",
-                                      alignItems: "center",
-                                    }}
-                                  >
-                                    {storyDate && (
-                                      <span
-                                        style={{
-                                          padding: "3px 8px",
-                                          borderRadius: 999,
-                                          fontSize: 11,
-                                          fontWeight: 700,
-                                          color: "#0F2A44",
-                                          background: `${timeScale.color}20`,
-                                          border: `1px solid ${timeScale.color}55`,
-                                        }}
-                                      >
-                                        {storyDate}
-                                      </span>
-                                    )}
-
-                                    {storyPeriod && storyPeriod !== storyDate && (
-                                      <span
-                                        style={{
-                                          padding: "3px 8px",
-                                          borderRadius: 999,
-                                          fontSize: 11,
-                                          fontWeight: 700,
-                                          color: "#0F2A44",
-                                          background: "rgba(107,33,168,0.10)",
-                                          border: "1px solid rgba(107,33,168,0.24)",
-                                        }}
-                                      >
-                                        {storyPeriod}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-
-                                <div style={{ fontSize: 12, color: "#666", whiteSpace: "nowrap" }}>
-                                  {formatDistance(s.distance_m)}
-                                </div>
-                              </div>
-
-                              <div
-                                className="ots-story-text"
-                                style={{
-                                  fontSize: 13,
-                                  lineHeight: 1.45,
-                                  color: "#374151",
-                                  display: "-webkit-box",
-                                  WebkitLineClamp: 2,
-                                  WebkitBoxOrient: "vertical",
-                                  overflow: "hidden",
-                                }}
-                              >
-                                {splitStory(s.description).intro || s.description}
-                              </div>
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <Link
-              href={addHref}
-              style={{
-                position: "absolute",
-                right: 16,
-                bottom: selected
-                  ? selectedSheetSnap === "peek"
-                    ? 164
-                    : selectedSheetSnap === "half"
-                      ? "44vh"
-                      : "74vh"
-                  : isMobile
-                    ? mobileListSnap === "peek"
-                      ? 108
-                      : mobileListSnap === "half"
-                        ? "42vh"
-                        : "66vh"
-                    : 16,
-                width: 56,
-                height: 56,
-                borderRadius: "50%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                background: "#00dbc1",
-                color: "#111",
-                fontSize: 28,
-                fontWeight: 900,
-                textDecoration: "none",
-                boxShadow: "0 10px 28px rgba(0,0,0,0.25)",
-                zIndex: 50,
-              }}
-              title="Add Spot"
-            >
-              +
-            </Link>
-          </div>
+          <MapView
+            pos={pos}
+            map={map}
+            setMap={setMap}
+            setMapCenter={setMapCenter}
+            setCrosshairPulseKey={setCrosshairPulseKey}
+            selected={selected}
+            pulsingMarkerId={pulsingMarkerId}
+            rankedFilteredSpots={rankedFilteredSpots}
+            shouldClusterMarkers={shouldClusterMarkers}
+            temporalClusterGroups={temporalClusterGroups}
+            clusterStyles={clusterStyles}
+            clusterCalculator={clusterCalculator}
+            markerIconForUser={markerIconForUser}
+            markerIconForVisibility={markerIconForVisibility}
+            onMapClick={() => setSelected(null)}
+            onSelectSpot={selectSpot}
+            crosshairPulseKey={crosshairPulseKey}
+            addHref={addHref}
+            isMobile={isMobile}
+            mobileListSnap={mobileListSnap}
+            selectedSheetSnap={selectedSheetSnap}
+            selectedSheetIsPeek={selectedSheetIsPeek}
+            selectedSheetIsHalf={selectedSheetIsHalf}
+            selectedSheetIsFull={selectedSheetIsFull}
+            selectedSheetHeightForSnap={selectedSheetHeightForSnap}
+            spotSheetDragY={spotSheetDragY}
+            onSpotSheetTouchStart={onSpotSheetTouchStart}
+            onSpotSheetTouchMove={onSpotSheetTouchMove}
+            onSpotSheetTouchEnd={onSpotSheetTouchEnd}
+            cycleSelectedSheetSnap={cycleSelectedSheetSnap}
+            onCloseSelected={() => setSelected(null)}
+            spotSheetPeekMinHeight={SPOT_SHEET_SNAP.peek}
+            selectedStoryParts={selectedStoryParts}
+            selectedStoryDate={selectedStoryDate}
+            selectedSourceBadge={selectedSourceBadge}
+            selectedStoryPeriod={selectedStoryPeriod}
+            selectedVisibilityLabel={selectedVisibilityLabel}
+            placeThroughTimeSpots={placeThroughTimeSpots}
+            placeThroughTimeEraLabel={placeThroughTimeEraLabel}
+            formatDistance={formatDistance}
+            formatStoryDate={formatStoryDate}
+            VisibilityBadge={VisibilityBadge}
+            TagPills={TagPills}
+          />
         </div>
       </div>
       </div>
