@@ -20,11 +20,72 @@ type ClusterStyleLike = {
   backgroundPosition?: string;
 };
 
+function distanceMetersBetween(
+  a: { lat: number; lng: number },
+  b: { lat: number; lng: number }
+) {
+  const toRad = (v: number) => (v * Math.PI) / 180;
+  const R = 6371000;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+
+  const x =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+
+  const c = 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+  return R * c;
+}
+
+function viewportRadiusFromMap(map: google.maps.Map) {
+  const center = map.getCenter();
+  const bounds = map.getBounds();
+  if (!center || !bounds) return null;
+
+  const centerPoint = { lat: center.lat(), lng: center.lng() };
+  const ne = bounds.getNorthEast();
+  const sw = bounds.getSouthWest();
+  const nw = { lat: ne.lat(), lng: sw.lng() };
+  const se = { lat: sw.lat(), lng: ne.lng() };
+
+  const candidates = [
+    { lat: ne.lat(), lng: ne.lng() },
+    { lat: sw.lat(), lng: sw.lng() },
+    nw,
+    se,
+  ];
+
+  const farthest = Math.max(
+    ...candidates.map((point) => distanceMetersBetween(centerPoint, point))
+  );
+
+  return Math.ceil(farthest * 1.15);
+}
+
+function viewportBoundsFromMap(map: google.maps.Map) {
+  const bounds = map.getBounds();
+  if (!bounds) return null;
+
+  const ne = bounds.getNorthEast();
+  const sw = bounds.getSouthWest();
+
+  return {
+    north: ne.lat(),
+    south: sw.lat(),
+    east: ne.lng(),
+    west: sw.lng(),
+  };
+}
+
 type MapViewProps = {
   pos: { lat: number; lng: number };
   map: google.maps.Map | null;
   setMap: (map: google.maps.Map | null) => void;
   setMapCenter: (center: { lat: number; lng: number } | null) => void;
+  setViewportRadiusM: (radius: number | null) => void;
+  setViewportBounds: (bounds: { north: number; south: number; east: number; west: number } | null) => void;
   setCrosshairPulseKey: React.Dispatch<React.SetStateAction<number>>;
 
   selected: Spot | null;
@@ -90,6 +151,8 @@ export default function MapView(props: MapViewProps) {
     map,
     setMap,
     setMapCenter,
+    setViewportRadiusM,
+    setViewportBounds,
     setCrosshairPulseKey,
     selected,
     pulsingMarkerId,
@@ -142,11 +205,15 @@ export default function MapView(props: MapViewProps) {
           setMap(m);
           const c = m.getCenter();
           if (c) setMapCenter({ lat: c.lat(), lng: c.lng() });
+          setViewportRadiusM(viewportRadiusFromMap(m));
+          setViewportBounds(viewportBoundsFromMap(m));
         }}
         onIdle={() => {
           if (!map) return;
           const c = map.getCenter();
           if (c) setMapCenter({ lat: c.lat(), lng: c.lng() });
+          setViewportRadiusM(viewportRadiusFromMap(map));
+          setViewportBounds(viewportBoundsFromMap(map));
           setCrosshairPulseKey((k) => k + 1);
         }}
         onClick={onMapClick}

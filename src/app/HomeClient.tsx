@@ -258,6 +258,13 @@ export default function HomePage() {
     lat: number;
     lng: number;
   } | null>(null);
+  const [viewportRadiusM, setViewportRadiusM] = useState<number | null>(null);
+  const [viewportBounds, setViewportBounds] = useState<{
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+  } | null>(null);
   const [queryCenter, setQueryCenter] = useState<{ lat: number; lng: number } | null>(null);
   const [crosshairPulseKey, setCrosshairPulseKey] = useState(0);
   const markerPulseTimeoutRef = useRef<number | null>(null);
@@ -488,7 +495,9 @@ export default function HomePage() {
 
   const availableTags = Array.from(
     new Set(
-      spots.flatMap((s) => (s.tags ?? []).map((t) => String(t).trim()).filter(Boolean))
+      filteredSpots.flatMap((s) =>
+        (s.tags ?? []).map((t) => String(t).trim()).filter(Boolean)
+      )
     )
   )
     .sort((a, b) => a.localeCompare(b))
@@ -499,8 +508,13 @@ export default function HomePage() {
       ? null
       : categories.find((c) => c.id === categoryFilter)?.label ?? "Category";
 
+  const effectiveDisplayRadiusM = Math.max(
+    250,
+    Math.min(radiusM, viewportRadiusM ?? radiusM)
+  );
+
   const activeFilterParts = [
-    radiusM !== 2500 ? formatDistance(radiusM) : null,
+    radiusM !== 2500 ? formatDistance(effectiveDisplayRadiusM) : null,
     selectedCategoryLabel,
     visibilityFilter !== "all"
       ? visibilityFilter.charAt(0).toUpperCase() + visibilityFilter.slice(1)
@@ -521,6 +535,12 @@ export default function HomePage() {
 
   const filterSummary = activeFilterParts.length
     ? activeFilterParts.join(" • ")
+    : null;
+
+  const filterSummaryShort = activeFilterParts.length
+    ? activeFilterParts.length <= 3
+      ? activeFilterParts.join(" • ")
+      : `${activeFilterParts.slice(0, 3).join(" • ")}…`
     : null;
 
   const mobileListExpanded = mobileListSnap !== "peek";
@@ -835,7 +855,7 @@ export default function HomePage() {
       }, // fallback: London
     );
   }, []);
-  
+
   // Throttle map-driven query recentering so tiny pan bursts do not spam refetches.
   useEffect(() => {
     if (!mapCenter) return;
@@ -910,7 +930,7 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    if (!queryCenter) return;
+    if (!viewportBounds) return;
 
     let cancelled = false;
 
@@ -918,10 +938,11 @@ export default function HomePage() {
       setLoadingSpots(true);
       setSpotsError(null);
 
-      const { data, error } = await supabase.rpc("spots_nearby", {
-        lat: queryCenter.lat,
-        lng: queryCenter.lng,
-        radius_m: radiusM,
+      const { data, error } = await supabase.rpc("spots_in_bounds", {
+        north: viewportBounds.north,
+        south: viewportBounds.south,
+        east: viewportBounds.east,
+        west: viewportBounds.west,
         category: categoryFilter === "all" ? null : categoryFilter,
         visibility: visibilityFilter === "all" ? null : visibilityFilter,
         time_filter: backendTimeFilterForEra(eraFilter),
@@ -945,7 +966,16 @@ export default function HomePage() {
     return () => {
       cancelled = true;
     };
-  }, [queryCenter, radiusM, categoryFilter, debouncedSearchText, importedOnly, supabase, visibilityFilter, tagFilter, eraFilter]);
+  }, [
+    viewportBounds,
+    categoryFilter,
+    debouncedSearchText,
+    importedOnly,
+    supabase,
+    visibilityFilter,
+    tagFilter,
+    eraFilter,
+  ]);
 
   // Close on Escape
   useEffect(() => {
@@ -1236,73 +1266,17 @@ export default function HomePage() {
             color: "#333",
           }}
         >
-          {/* Desktop controls */}
+          <button
+            type="button"
+            className="ots-header-filter-trigger"
+            onClick={() => setShowFilters(true)}
+            title={filterSummary ?? "Filters"}
+          >
+            {filterSummaryShort ? `Filters • ${filterSummaryShort}` : "Filters"}
+          </button>
+
+          {/* Header actions */}
           <div className="ots-header-controls">
-            <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              Radius:
-              <select
-                value={radiusM}
-                onChange={(e) => setRadiusM(Number(e.target.value))}
-              >
-                <option value={1000}>1 km</option>
-                <option value={2500}>2.5 km</option>
-                <option value={5000}>5 km</option>
-                <option value={10000}>10 km</option>
-                <option value={100000}>100 km</option>
-                <option value={250000}>250 km</option>
-                <option value={500000}>500 km</option>
-                <option value={1000000}>1000 km</option>
-              </select>
-            </label>
-
-            <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              Visibility:
-              <select value={visibilityFilter} onChange={(e) => setVisibilityFilter(e.target.value)}>
-                <option value="all">All</option>
-                <option value="public">Public</option>
-                <option value="friends">Friends</option>
-                <option value="group">Group</option>
-                <option value="private">Private</option>
-              </select>
-            </label>
-
-            <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              Era:
-              <select value={eraFilter} onChange={(e) => setEraFilter(e.target.value as any)}>
-                <option value="all">All time</option>
-                <option value="modern">Modern</option>
-                <option value="human">Human history</option>
-                <option value="prehistoric">Prehistory</option>
-                <option value="geological">Geological</option>
-              </select>
-            </label>
-
-            <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              Category:
-              <select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-              >
-                <option value="all">All</option>
-                {(categoriesLoaded ? categories : []).map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <input
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              placeholder="Search…"
-              style={{
-                padding: "6px 10px",
-                borderRadius: 12,
-                border: "1px solid rgba(0,0,0,0.2)",
-                width: 180,
-              }}
-            />
 
             {isAdmin && (
               <details className="ots-admin-menu">
@@ -1325,16 +1299,6 @@ export default function HomePage() {
               <button type="submit">Log out</button>
             </form>
           </div>
-
-          {/* Mobile button */}
-          <button
-            className="ots-filters-btn"
-            type="button"
-            onClick={() => setShowFilters(true)}
-            title={filterSummary ?? "Filters"}
-          >
-            {filterSummary ? `Filters • ${filterSummary}` : "Filters"}
-          </button>
         </div>
       }
     >
@@ -1787,6 +1751,8 @@ export default function HomePage() {
             map={map}
             setMap={setMap}
             setMapCenter={setMapCenter}
+            setViewportRadiusM={setViewportRadiusM}
+            setViewportBounds={setViewportBounds}
             setCrosshairPulseKey={setCrosshairPulseKey}
             selected={selected}
             pulsingMarkerId={pulsingMarkerId}
