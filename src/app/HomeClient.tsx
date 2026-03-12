@@ -33,6 +33,14 @@ import {
   markerIconForUser,
 } from "@/map/markerIcons";
 
+import {
+  NEARBY_SHEET_SNAP,
+  SPOT_SHEET_SNAP,
+  CLUSTERING_THRESHOLD,
+  nearbySheetHeightForSnap,
+  spotSheetHeightForSnap,
+} from "@/map/mapConfig";
+
 type Spot = {
   id: string;
   user_id: string;
@@ -511,7 +519,9 @@ export default function HomePage() {
 
   const mobileListExpanded = mobileListSnap !== "peek";
   const mobileSnapOrder: Array<"peek" | "half" | "full"> = ["peek", "half", "full"];
-  const shouldClusterMarkers = filteredSpots.length >= (isMobile ? 12 : 20);
+  const shouldClusterMarkers =
+    filteredSpots.length >=
+    (isMobile ? CLUSTERING_THRESHOLD.mobile : CLUSTERING_THRESHOLD.desktop);
   const temporalClusterGroups =
     eraFilter === "all"
       ? [
@@ -636,11 +646,7 @@ export default function HomePage() {
   }
 
   function mobileListHeightForSnap() {
-    return mobileListSnap === "peek"
-      ? 92
-      : mobileListSnap === "half"
-        ? 320
-        : 640;
+    return nearbySheetHeightForSnap(mobileListSnap);
   }
 
   function resetMobileListDrag() {
@@ -1069,11 +1075,7 @@ export default function HomePage() {
   const selectedSheetIsFull = selectedSheetSnap === "full";
 
   function selectedSheetHeightForSnap() {
-    return selectedSheetSnap === "peek"
-      ? 148
-      : selectedSheetSnap === "half"
-        ? 360
-        : 620;
+    return spotSheetHeightForSnap(selectedSheetSnap);
   }
 
   function cycleSelectedSheetSnap() {
@@ -1974,7 +1976,7 @@ export default function HomePage() {
                       bottom: 8,
                       zIndex: 20,
                       height: isMobile
-                        ? `min(calc(100vh - 24px), ${Math.max(92, mobileListHeightForSnap() - mobileListDragY)}px)`
+                        ? `min(calc(100vh - 24px), ${Math.max(NEARBY_SHEET_SNAP.peek, mobileListHeightForSnap() - mobileListDragY)}px)`
                         : undefined,
                       borderRadius: 16,
                       boxShadow: "0 16px 40px rgba(0,0,0,0.22)",
@@ -2546,7 +2548,7 @@ export default function HomePage() {
                   borderTopLeftRadius: 18,
                   borderTopRightRadius: 18,
                   padding: 16,
-                  height: `min(calc(100vh - 24px), ${Math.max(148, selectedSheetHeightForSnap() - spotSheetDragY)}px)`,
+                  height: `min(calc(100vh - 24px), ${Math.max(SPOT_SHEET_SNAP.peek, selectedSheetHeightForSnap() - spotSheetDragY)}px)`,
                   overflowY: "auto",
                   boxShadow: "0 -10px 40px rgba(0,0,0,0.25)",
                   transform: undefined,
