@@ -20,6 +20,8 @@ export type Spot = {
   lng_out: number;
   is_imported: boolean;
   time_scale_out?: "human" | "ancient" | "geological" | string | null;
+  years_ago_start_out?: number | null;
+  years_ago_end_out?: number | null;
   period_label_out?: string | null;
 };
 

@@ -62,6 +62,39 @@ function splitStory(description: string) {
   return { intro, rest };
 }
 
+function formatGeologicalPeriod(
+  spot: Pick<
+    Spot,
+    "time_scale_out" | "years_ago_start_out" | "years_ago_end_out" | "period_label_out"
+  >
+) {
+  if (spot.time_scale_out !== "geological") return null;
+
+  if (spot.period_label_out) return spot.period_label_out;
+
+  const start = spot.years_ago_start_out;
+  const end = spot.years_ago_end_out;
+
+  const fmt = (value: number) => {
+    if (value >= 1000000) {
+      const m = value / 1000000;
+      return `${Number.isInteger(m) ? m.toFixed(0) : m.toFixed(1)} million years ago`;
+    }
+    if (value >= 1000) {
+      const k = value / 1000;
+      return `${Number.isInteger(k) ? k.toFixed(0) : k.toFixed(1)} thousand years ago`;
+    }
+    return `${value} years ago`;
+  };
+
+  if (typeof start === "number" && typeof end === "number") {
+    return `${fmt(start)} → ${fmt(end)}`;
+  }
+  if (typeof start === "number") return fmt(start);
+  if (typeof end === "number") return fmt(end);
+  return "Deep time";
+}
+
 export default function NearbySheet(props: NearbySheetProps) {
   const {
     isMobile,
@@ -286,8 +319,11 @@ export default function NearbySheet(props: NearbySheetProps) {
           ) : (
             <div style={{ display: "grid", gap: 10 }}>
               {rankedFilteredSpots.map((s) => {
-                const storyDate = formatStoryDate(s.date_start);
-                const storyPeriod = s.period_label_out ?? storyPeriodLabel(s.date_start);
+                const geologicalPeriod = formatGeologicalPeriod(s);
+                const storyDate = geologicalPeriod ?? formatStoryDate(s.date_start);
+                const storyPeriod = geologicalPeriod
+                  ? null
+                  : s.period_label_out ?? storyPeriodLabel(s.date_start);
                 const sourceBadge = sourceBadgeLabel(s.source_url);
                 const visibilityLabel = visibilityStoryLabel(s.visibility);
                 const storyParts = splitStory(s.description);
@@ -415,8 +451,14 @@ export default function NearbySheet(props: NearbySheetProps) {
                             fontSize: 12,
                             fontWeight: 700,
                             color: "#0F2A44",
-                            background: `${timeScale.color}18`,
-                            border: `1px solid ${timeScale.color}33`,
+                            background:
+                              s.time_scale_out === "geological"
+                                ? "rgba(139,92,246,0.14)"
+                                : `${timeScale.color}18`,
+                            border:
+                              s.time_scale_out === "geological"
+                                ? "1px solid rgba(139,92,246,0.26)"
+                                : `1px solid ${timeScale.color}33`,
                           }}
                         >
                           {storyDate}
@@ -436,6 +478,22 @@ export default function NearbySheet(props: NearbySheetProps) {
                           }}
                         >
                           {storyPeriod}
+                        </span>
+                      )}
+
+                      {s.time_scale_out === "geological" && (
+                        <span
+                          style={{
+                            padding: "4px 8px",
+                            borderRadius: 999,
+                            fontSize: 12,
+                            fontWeight: 700,
+                            color: "#4c1d95",
+                            background: "rgba(139,92,246,0.10)",
+                            border: "1px solid rgba(139,92,246,0.20)",
+                          }}
+                        >
+                          Geological
                         </span>
                       )}
 

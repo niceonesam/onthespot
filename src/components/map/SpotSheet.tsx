@@ -29,6 +29,39 @@ type SpotSheetProps = {
   formatStoryDate: (date?: string | null) => string | null;
 };
 
+function formatGeologicalPeriod(
+  spot: Pick<
+    Spot,
+    "time_scale_out" | "years_ago_start_out" | "years_ago_end_out" | "period_label_out"
+  >
+) {
+  if (spot.time_scale_out !== "geological") return null;
+
+  if (spot.period_label_out) return spot.period_label_out;
+
+  const start = spot.years_ago_start_out;
+  const end = spot.years_ago_end_out;
+
+  const fmt = (value: number) => {
+    if (value >= 1000000) {
+      const m = value / 1000000;
+      return `${Number.isInteger(m) ? m.toFixed(0) : m.toFixed(1)} million years ago`;
+    }
+    if (value >= 1000) {
+      const k = value / 1000;
+      return `${Number.isInteger(k) ? k.toFixed(0) : k.toFixed(1)} thousand years ago`;
+    }
+    return `${value} years ago`;
+  };
+
+  if (typeof start === "number" && typeof end === "number") {
+    return `${fmt(start)} → ${fmt(end)}`;
+  }
+  if (typeof start === "number") return fmt(start);
+  if (typeof end === "number") return fmt(end);
+  return "Deep time";
+}
+
 export default function SpotSheet({
   selected,
   spotSheetDragY,
@@ -56,6 +89,10 @@ export default function SpotSheet({
   formatStoryDate,
 }: SpotSheetProps) {
   if (!selected) return null;
+
+  const selectedGeologicalPeriod = formatGeologicalPeriod(selected);
+  const displayStoryDate = selectedGeologicalPeriod ?? selectedStoryDate;
+  const displayStoryPeriod = selectedGeologicalPeriod ? null : selectedStoryPeriod;
 
   return (
     <div
@@ -142,7 +179,7 @@ export default function SpotSheet({
               alignItems: "center",
             }}
           >
-            {selectedStoryDate && (
+            {displayStoryDate && (
               <span
                 style={{
                   padding: "4px 8px",
@@ -150,15 +187,21 @@ export default function SpotSheet({
                   fontSize: 12,
                   fontWeight: 700,
                   color: "#0F2A44",
-                  background: "rgba(31,182,166,0.10)",
-                  border: "1px solid rgba(31,182,166,0.24)",
+                  background:
+                    selected.time_scale_out === "geological"
+                      ? "rgba(139,92,246,0.14)"
+                      : "rgba(31,182,166,0.10)",
+                  border:
+                    selected.time_scale_out === "geological"
+                      ? "1px solid rgba(139,92,246,0.26)"
+                      : "1px solid rgba(31,182,166,0.24)",
                 }}
               >
-                {selectedStoryDate}
+                {displayStoryDate}
               </span>
             )}
 
-            {selectedStoryPeriod && selectedStoryPeriod !== selectedStoryDate && (
+            {displayStoryPeriod && displayStoryPeriod !== displayStoryDate && (
               <span
                 style={{
                   padding: "4px 8px",
@@ -170,7 +213,23 @@ export default function SpotSheet({
                   border: "1px solid rgba(107,33,168,0.24)",
                 }}
               >
-                {selectedStoryPeriod}
+                {displayStoryPeriod}
+              </span>
+            )}
+
+            {selected.time_scale_out === "geological" && (
+              <span
+                style={{
+                  padding: "4px 8px",
+                  borderRadius: 999,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: "#4c1d95",
+                  background: "rgba(139,92,246,0.10)",
+                  border: "1px solid rgba(139,92,246,0.20)",
+                }}
+              >
+                Geological
               </span>
             )}
 
@@ -357,7 +416,8 @@ export default function SpotSheet({
                 let lastEraLabel: string | null = null;
 
                 return visibleSpots.map((spot, index) => {
-                const period = spot.period_label_out ?? null;
+                const geologicalPeriod = formatGeologicalPeriod(spot);
+                const period = geologicalPeriod ?? spot.period_label_out ?? null;
                 const eraLabel = placeThroughTimeEraLabel(spot);
                 const showEraDivider = eraLabel !== lastEraLabel;
                 lastEraLabel = eraLabel;
@@ -446,12 +506,19 @@ export default function SpotSheet({
                             >
                             {spot.title}
                             </div>
-                            <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>
-                            {formatStoryDate(spot.date_start)
-                                ? `${formatStoryDate(spot.date_start)}`
-                                : eraLabel}
-                            {period && period !== formatStoryDate(spot.date_start)
+                          <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>
+                            {geologicalPeriod
+                                ? geologicalPeriod
+                                : formatStoryDate(spot.date_start)
+                                  ? `${formatStoryDate(spot.date_start)}`
+                                  : eraLabel}
+                            {period &&
+                            !geologicalPeriod &&
+                            period !== formatStoryDate(spot.date_start)
                                 ? ` • ${period}`
+                                : ""}
+                            {spot.time_scale_out === "geological"
+                                ? " • deep time"
                                 : ""}
                             </div>
                         </div>
@@ -479,7 +546,7 @@ export default function SpotSheet({
                         </div>
                         </div>
 
-                        <div
+                      <div
                         className="ots-story-text"
                         style={{
                             fontSize: 14,
@@ -491,6 +558,7 @@ export default function SpotSheet({
                             overflow: "hidden",
                         }}
                         >
+                        {spot.time_scale_out === "geological" ? "🪨 " : ""}
                         {spot.description}
                         </div>
                     </div>

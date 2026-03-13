@@ -339,6 +339,7 @@ function getFirstClaimDate(claims, propertyIds) {
   return null;
 }
 
+
 function getEntityIdClaims(claims, propertyId) {
   const claimList = claims?.[propertyId] ?? [];
   const ids = [];
@@ -347,6 +348,74 @@ function getEntityIdClaims(claims, propertyId) {
     if (typeof id === "string") ids.push(id);
   }
   return ids;
+}
+
+function inferGeologicalRangeFromText(text) {
+  const ranges = [
+    { pattern: /cambrian/, years_ago_start: 541000000, years_ago_end: 485000000 },
+    { pattern: /ordovician/, years_ago_start: 485000000, years_ago_end: 444000000 },
+    { pattern: /silurian/, years_ago_start: 444000000, years_ago_end: 419000000 },
+    { pattern: /devonian/, years_ago_start: 419000000, years_ago_end: 359000000 },
+    { pattern: /carboniferous/, years_ago_start: 359000000, years_ago_end: 299000000 },
+    { pattern: /permian/, years_ago_start: 299000000, years_ago_end: 252000000 },
+    { pattern: /triassic/, years_ago_start: 252000000, years_ago_end: 201000000 },
+    { pattern: /jurassic/, years_ago_start: 201000000, years_ago_end: 145000000 },
+    { pattern: /cretaceous/, years_ago_start: 145000000, years_ago_end: 66000000 },
+    { pattern: /paleogene/, years_ago_start: 66000000, years_ago_end: 23000000 },
+    { pattern: /neogene/, years_ago_start: 23000000, years_ago_end: 2600000 },
+    { pattern: /quaternary/, years_ago_start: 2600000, years_ago_end: 0 },
+    { pattern: /pleistocene/, years_ago_start: 2580000, years_ago_end: 11700 },
+    { pattern: /holocene/, years_ago_start: 11700, years_ago_end: 0 },
+    { pattern: /younger\s+dryas/, years_ago_start: 12900, years_ago_end: 11700 },
+    { pattern: /late\s+glacial/, years_ago_start: 14600, years_ago_end: 11700 },
+    { pattern: /b[øo]lling[-–\s]*aller[øo]d/, years_ago_start: 14700, years_ago_end: 12900 },
+    { pattern: /older\s+dryas/, years_ago_start: 18000, years_ago_end: 14700 },
+    { pattern: /devensian|ice age|glacial/, years_ago_start: 26000, years_ago_end: 11700 },
+  ];
+
+  for (const range of ranges) {
+    if (range.pattern.test(text)) {
+      return {
+        years_ago_start: range.years_ago_start,
+        years_ago_end: range.years_ago_end,
+      };
+    }
+  }
+
+  return null;
+}
+
+function inferTemporalMetadataFromText({ title, extract, wikiDescription, wikidataDescription, tags }) {
+  const text = [
+    title,
+    extract,
+    wikiDescription,
+    wikidataDescription,
+    ...(tags ?? []),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  const looksGeological = /(geolog|bedrock|alluvium|glacial|ice age|devensian|triassic|jurassic|cretaceous|pleistocene|holocene|quaternary|paleogene|neogene|permian|carboniferous|devonian|silurian|ordovician|cambrian|floodplain|sediment|sandstone|moraine|younger dryas|late glacial|older dryas|bølling|bolling|allerød|allerod)/.test(
+    text
+  );
+
+  if (!looksGeological) {
+    return {
+      time_scale: null,
+      years_ago_start: null,
+      years_ago_end: null,
+    };
+  }
+
+  const inferredRange = inferGeologicalRangeFromText(text);
+
+  return {
+    time_scale: "geological",
+    years_ago_start: inferredRange?.years_ago_start ?? null,
+    years_ago_end: inferredRange?.years_ago_end ?? null,
+  };
 }
 
 function inferCategoryFromText({ title, extract, wikiDescription, wikidataDescription, p31Ids }) {
@@ -372,7 +441,10 @@ function inferCategoryFromText({ title, extract, wikiDescription, wikidataDescri
 function inferEraFromDateAndText(dateStart, { title, extract, wikiDescription }) {
   const text = [title, extract, wikiDescription].filter(Boolean).join(" ").toLowerCase();
 
-  if (/geolog|jurassic|bronze age|iron age|neolithic|prehistoric/.test(text)) return "Prehistory";
+  if (/geolog|cambrian|ordovician|silurian|devonian|carboniferous|permian|triassic|jurassic|cretaceous|paleogene|neogene|quaternary|pleistocene|holocene|glacial|ice age|devensian|alluvium|sandstone|sediment|floodplain|moraine/.test(text)) {
+    return "Geological Time";
+  }
+  if (/bronze age|iron age|neolithic|prehistoric/.test(text)) return "Prehistory";
   if (/roman|eboracum/.test(text)) return "Roman Britain";
   if (/viking|jorvik|norse/.test(text)) return "Viking Age";
   if (/norman/.test(text)) return "Norman Britain";
@@ -507,6 +579,14 @@ async function buildGeneratedEntryMetadata({ title, extract, wikiDescription }) 
     p31Ids,
   });
 
+  const temporal = inferTemporalMetadataFromText({
+    title,
+    extract,
+    wikiDescription,
+    wikidataDescription,
+    tags: p31Ids,
+  });
+
   const era = inferEraFromDateAndText(dateStart, {
     title,
     extract,
@@ -518,6 +598,9 @@ async function buildGeneratedEntryMetadata({ title, extract, wikiDescription }) 
     date_end: dateEnd,
     category,
     era,
+    time_scale: temporal.time_scale,
+    years_ago_start: temporal.years_ago_start,
+    years_ago_end: temporal.years_ago_end,
     wikibaseItem: pageMeta?.wikibaseItem ?? null,
     wikidataDescription,
     p31Ids,
@@ -668,6 +751,9 @@ async function generateEntries({ slug, place, query, limit }) {
       lng: pack?.place?.lng ?? 0,
       area_note: packPlaceName ? `Generated near ${packPlaceName}. Review exact relevance to place.` : null,
       era: inferred.era,
+      time_scale: inferred.time_scale,
+      years_ago_start: inferred.years_ago_start,
+      years_ago_end: inferred.years_ago_end,
       tags: [...new Set([...tags, ...relatedTitles, ...(inferred.p31Ids ?? []), inferred.wikibaseItem, inferred.wikidataDescription])].filter(Boolean),
       media,
       review_status: "draft",

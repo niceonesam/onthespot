@@ -16,6 +16,9 @@ type PackEntry = {
   title: string;
   date_start: string | null;
   date_end: string | null;
+  time_scale?: "geological" | "historical" | null;
+  years_ago_start?: number | null;
+  years_ago_end?: number | null;
   category: string;
   description: string;
   significance: string;
@@ -126,15 +129,58 @@ function labelRow(text: string, helpKey?: keyof typeof FIELD_HELP) {
   );
 }
 
-function entryYear(entry: PackEntry): number | null {
+function entryTimelineValue(entry: PackEntry): number | null {
+  if (entry.time_scale === "geological") {
+    const yearsAgo = entry.years_ago_start ?? entry.years_ago_end;
+    if (typeof yearsAgo === "number" && Number.isFinite(yearsAgo)) {
+      return -yearsAgo;
+    }
+    return null;
+  }
+
   const raw = entry.date_start ?? entry.date_end;
   if (!raw) return null;
   const year = Number(String(raw).slice(0, 4));
   return Number.isFinite(year) ? year : null;
 }
 
+function formatGeologicalLabel(entry: PackEntry): string | null {
+  if (entry.time_scale !== "geological") return null;
+
+  const start = entry.years_ago_start;
+  const end = entry.years_ago_end;
+
+  const fmt = (value: number) => {
+    if (value >= 1000000) {
+      const m = value / 1000000;
+      return `${Number.isInteger(m) ? m.toFixed(0) : m.toFixed(1)} million years ago`;
+    }
+    if (value >= 1000) {
+      const k = value / 1000;
+      return `${Number.isInteger(k) ? k.toFixed(0) : k.toFixed(1)} thousand years ago`;
+    }
+    return `${value} years ago`;
+  };
+
+  if (typeof start === "number" && typeof end === "number") {
+    return `${fmt(start)} → ${fmt(end)}`;
+  }
+  if (typeof start === "number") return fmt(start);
+  if (typeof end === "number") return fmt(end);
+  return "Deep time";
+}
+
 function formatYearLabel(year: number | null): string {
   if (year == null) return "Unknown";
+  if (year <= -1000) {
+    const yearsAgo = Math.abs(year);
+    if (yearsAgo >= 1000000) {
+      const m = yearsAgo / 1000000;
+      return `${Number.isInteger(m) ? m.toFixed(0) : m.toFixed(1)}m years ago`;
+    }
+    const k = yearsAgo / 1000;
+    return `${Number.isInteger(k) ? k.toFixed(0) : k.toFixed(1)}k years ago`;
+  }
   if (year < 0) return `${Math.abs(year)} BCE`;
   return String(year);
 }
@@ -222,7 +268,7 @@ export default function PlacePackEditor({ slug }: { slug: string }) {
 
   const timelineEntries = useMemo(() => {
     const withYears = [...(pack?.entries ?? [])]
-      .map((entry) => ({ entry, year: entryYear(entry) }))
+      .map((entry) => ({ entry, year: entryTimelineValue(entry) }))
       .filter((item) => item.year != null) as Array<{
       entry: PackEntry;
       year: number;
@@ -700,7 +746,7 @@ export default function PlacePackEditor({ slug }: { slug: string }) {
                         width: 10,
                         height: 10,
                         borderRadius: 999,
-                        background: "#00d5d1",
+                        background: entry.time_scale === "geological" ? "#8b5cf6" : "#00d5d1",
                         border: "2px solid white",
                         boxShadow: "0 0 0 1px rgba(0,0,0,0.08)",
                       }}
@@ -721,15 +767,18 @@ export default function PlacePackEditor({ slug }: { slug: string }) {
                         style={{
                           fontSize: 13,
                           fontWeight: 800,
-                          color: "#0f766e",
+                          color: entry.time_scale === "geological" ? "#6b21a8" : "#0f766e",
                         }}
                       >
-                        {formatYearLabel(year)}
+                        {entry.time_scale === "geological"
+                          ? formatGeologicalLabel(entry)
+                          : formatYearLabel(year)}
                       </div>
                     </div>
 
                     <div style={{ fontSize: 13, color: "#555" }}>
                       {entry.category} • {entry.era}
+                      {entry.time_scale === "geological" ? " • deep time" : ""}
                     </div>
 
                     <div style={{ fontSize: 13, color: "#444", lineHeight: 1.4 }}>
