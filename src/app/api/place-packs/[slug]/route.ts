@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { getPackData } from "../../../../../tools/place-pack.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,6 +9,9 @@ export async function GET(
 ) {
   try {
     const { slug } = await params;
+    const { getPackData } = await import(
+      "../../../../../tools/place-pack.mjs"
+    );
     const pack = getPackData(slug);
     return NextResponse.json({ ok: true, pack });
   } catch (error) {
