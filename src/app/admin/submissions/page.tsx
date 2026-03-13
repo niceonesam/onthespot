@@ -289,6 +289,9 @@ export default function AdminSubmissionsPage() {
           >
             Submissions
           </a>
+          <a href="/admin/place-packs" className="ots-link">
+            Place Packs
+          </a>
         </div>
       }
     >

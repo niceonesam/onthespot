@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { GoogleMap, useLoadScript } from "@react-google-maps/api";
 import { getSupabaseBrowser } from "@/lib/supabase/browser";
 import Link from "next/link";
@@ -240,6 +240,35 @@ function splitStory(description: string) {
 // ---------- page component ----------
 export default function HomePage() {
   const supabase = getSupabaseBrowser();
+
+  const placePackPreviewParams = useMemo(() => {
+    if (typeof window === "undefined") {
+      return {
+        isPreview: false,
+        lat: null as number | null,
+        lng: null as number | null,
+        radiusM: null as number | null,
+        slug: null as string | null,
+      };
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const lat = Number(params.get("lat"));
+    const lng = Number(params.get("lng"));
+    const radiusRaw = Number(params.get("radius_m"));
+    const slug = params.get("place_pack_slug");
+    const isPreview = params.get("place_pack_preview") === "1";
+
+    return {
+      isPreview: isPreview && Number.isFinite(lat) && Number.isFinite(lng),
+      lat: Number.isFinite(lat) ? lat : null,
+      lng: Number.isFinite(lng) ? lng : null,
+      radiusM: Number.isFinite(radiusRaw) ? radiusRaw : null,
+      slug: slug?.trim() ? slug.trim() : null,
+    };
+  }, []);
+
+  const isPlacePackPreview = placePackPreviewParams.isPreview;
 
   const { isLoaded } = useLoadScript({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
@@ -842,6 +871,24 @@ export default function HomePage() {
     }, []);
 
   useEffect(() => {
+    if (
+      isPlacePackPreview &&
+      placePackPreviewParams.lat != null &&
+      placePackPreviewParams.lng != null
+    ) {
+      const next = {
+        lat: placePackPreviewParams.lat,
+        lng: placePackPreviewParams.lng,
+      };
+      setPos(next);
+      setQueryCenter(next);
+      setMapCenter(next);
+      if (placePackPreviewParams.radiusM != null) {
+        setRadiusM(placePackPreviewParams.radiusM);
+      }
+      return;
+    }
+
     navigator.geolocation.getCurrentPosition(
       (p) => {
         const next = { lat: p.coords.latitude, lng: p.coords.longitude };
@@ -852,9 +899,9 @@ export default function HomePage() {
         const fallback = { lat: 51.5074, lng: -0.1278 };
         setPos(fallback);
         setQueryCenter(fallback);
-      }, // fallback: London
+      }
     );
-  }, []);
+  }, [isPlacePackPreview, placePackPreviewParams.lat, placePackPreviewParams.lng, placePackPreviewParams.radiusM]);
 
   // Throttle map-driven query recentering so tiny pan bursts do not spam refetches.
   useEffect(() => {
@@ -904,6 +951,23 @@ export default function HomePage() {
     mq.addListener(listener);
     return () => mq.removeListener(listener);
   }, []);
+
+  useEffect(() => {
+    if (!isPlacePackPreview || !map || placePackPreviewParams.lat == null || placePackPreviewParams.lng == null) {
+      return;
+    }
+
+    const center = {
+      lat: placePackPreviewParams.lat,
+      lng: placePackPreviewParams.lng,
+    };
+
+    map.panTo(center);
+
+    const radius = placePackPreviewParams.radiusM ?? 600;
+    const zoom = radius <= 250 ? 17 : radius <= 600 ? 16 : radius <= 1200 ? 15 : 14;
+    map.setZoom(zoom);
+  }, [isPlacePackPreview, map, placePackPreviewParams.lat, placePackPreviewParams.lng, placePackPreviewParams.radiusM]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -1254,9 +1318,10 @@ export default function HomePage() {
 
   return (
     <AppShell
-      subtitle="Nearby stories on the map"
+      subtitle={isPlacePackPreview ? `Place pack preview${placePackPreviewParams.slug ? ` • ${placePackPreviewParams.slug}` : ""}` : "Nearby stories on the map"}
       fullBleed
       right={
+        isPlacePackPreview ? null :
         <div
           style={{
             marginLeft: "auto",
@@ -1288,6 +1353,9 @@ export default function HomePage() {
                   <Link href="/admin/submissions" className="ots-admin-item">
                     Submissions
                   </Link>
+                  <Link href="/admin/place-packs" className="ots-admin-item">
+                    Place Packs
+                  </Link>
                 </div>
               </details>
             )}
@@ -1302,7 +1370,7 @@ export default function HomePage() {
         </div>
       }
     >
-      {showOnboarding && !checkingOnboarding && (
+      {!isPlacePackPreview && showOnboarding && !checkingOnboarding && (
         <div
           onClick={() => {
             // Clicking the overlay should NOT mark onboarding as complete.
@@ -1553,7 +1621,7 @@ export default function HomePage() {
         </div>
       )}
 
-      <FiltersSheet
+      {!isPlacePackPreview && <FiltersSheet
         showFilters={showFilters}
         isMobile={isMobile}
         filterSheetDragY={filterSheetDragY}
@@ -1590,11 +1658,11 @@ export default function HomePage() {
           setImportedOnly(false);
           setRadiusM(2500);
         }}
-      />
+      />}
 
       {/* MAIN CONTENT */}
       <div style={{ height: "100%", display: "flex", minHeight: 0, flexDirection: "column" }}>
-        {isMobile && (
+        {isMobile && !isPlacePackPreview && (
           <div
             style={{
               display: "grid",
@@ -1706,7 +1774,7 @@ export default function HomePage() {
           }}
         >
           {/* Nearby list: desktop sidebar, mobile bottom sheet */}
-            <NearbySheet
+            {!isPlacePackPreview && <NearbySheet
               isMobile={isMobile}
               mobileListSnap={mobileListSnap}
               mobileListExpanded={mobileListExpanded}
@@ -1742,7 +1810,7 @@ export default function HomePage() {
 
               VisibilityBadge={VisibilityBadge}
               TagPills={TagPills}
-            />
+            />}
           
 
           {/* Right panel: Map */}
@@ -1763,11 +1831,13 @@ export default function HomePage() {
             clusterCalculator={clusterCalculator}
             markerIconForUser={markerIconForUser}
             markerIconForVisibility={markerIconForVisibility}
-            onMapClick={() => setSelected(null)}
+            onMapClick={() => {
+              if (!isPlacePackPreview) setSelected(null);
+            }}
             onSelectSpot={selectSpot}
             crosshairPulseKey={crosshairPulseKey}
-            addHref={addHref}
-            isMobile={isMobile}
+            addHref={isPlacePackPreview ? "#" : addHref}
+            isMobile={isPlacePackPreview ? false : isMobile}
             mobileListSnap={mobileListSnap}
             selectedSheetSnap={selectedSheetSnap}
             selectedSheetIsPeek={selectedSheetIsPeek}

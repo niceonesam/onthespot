@@ -330,6 +330,24 @@ export default function FiltersSheet(props: FiltersSheetProps) {
                 >
                   Admin: Submissions
                 </Link>
+
+                <Link
+                  href="/admin/place-packs/york-minster"
+                  onClick={onClose}
+                  style={{
+                    display: "block",
+                    textAlign: "center",
+                    padding: 12,
+                    borderRadius: 12,
+                    border: "1px solid rgba(0,0,0,0.2)",
+                    background: "white",
+                    textDecoration: "none",
+                    color: "#111",
+                    fontWeight: 700,
+                  }}
+                >
+                  Admin: Place Packs
+                </Link>
               </div>
             )}
 

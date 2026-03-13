@@ -1,0 +1,702 @@
+{
+  "place": {
+    "slug": "york-minster",
+    "name": "York Minster and Central York",
+    "lat": 53.9623,
+    "lng": -1.0819,
+    "radius_m": 600,
+    "summary": "A deeply layered historic city centre spanning Roman, Viking, medieval, industrial, wartime and modern heritage history.",
+    "country": "United Kingdom",
+    "region": "Yorkshire",
+    "hero_image_url": null
+  },
+  "entries": [
+    {
+      "title": "Roman Fortress of Eboracum Established",
+      "id": "york-001",
+      "date_start": "0071-01-01",
+      "date_end": null,
+      "category": "landmark",
+      "description": "The Roman fortress of Eboracum was established around 71 AD by the Ninth Legion at the meeting of the Rivers Ouse and Foss. Its position made it one of the most strategically important military sites in northern Britain, and the Roman street plan continued to shape the city long after the empire faded.",
+      "significance": "This established York as one of the most important Roman centres in Britain.",
+      "source_url": "https://www.yorkshiremuseum.org.uk/collections/collections-highlights/roman-york/",
+      "confidence": 5,
+      "lat": 53.9623,
+      "lng": -1.0819,
+      "area_note": "Anchored to central York near the Roman fortress area beneath and around the Minster precinct.",
+      "era": "Roman Britain",
+      "tags": [
+        "roman",
+        "eboracum",
+        "fortress",
+        "military"
+      ],
+      "media": [],
+      "review_status": "approved",
+      "origin": "manual",
+      "visibility": "public",
+      "status": "active"
+    },
+    {
+      "title": "Constantius Chlorus Dies at York",
+      "id": "york-002",
+      "date_start": "0306-07-25",
+      "date_end": null,
+      "category": "death",
+      "description": "The Roman emperor Constantius Chlorus died at Eboracum in 306. His death in York triggered a moment of extraordinary imperial consequence, as the city became the stage for the rise of his son Constantine.",
+      "significance": "York briefly became the pivot point of Roman imperial succession.",
+      "source_url": "https://www.britannica.com/biography/Constantius-I-Chlorus",
+      "confidence": 4,
+      "lat": 53.9623,
+      "lng": -1.0819,
+      "area_note": "Associated with Roman York and the fortress zone.",
+      "era": "Roman Britain",
+      "tags": [
+        "roman",
+        "emperor",
+        "constantius",
+        "imperial"
+      ],
+      "media": [],
+      "review_status": "approved",
+      "origin": "manual",
+      "visibility": "public",
+      "status": "active"
+    },
+    {
+      "title": "Constantine Proclaimed Roman Emperor",
+      "id": "york-003",
+      "date_start": "0306-07-25",
+      "date_end": null,
+      "category": "political",
+      "description": "Following the death of Constantius Chlorus, troops in York proclaimed Constantine emperor. The decision made in this northern frontier city helped set Constantine on the path to becoming one of the most consequential rulers in world history, later transforming the Roman Empire and its relationship with Christianity.",
+      "significance": "York played a direct role in the rise of Constantine and the future shape of Europe.",
+      "source_url": "https://historicengland.org.uk/listing/what-is-designation/heritage-highlights/constantine-in-york/",
+      "confidence": 5,
+      "lat": 53.9623,
+      "lng": -1.0819,
+      "area_note": "Linked to the Roman fortress area of Eboracum.",
+      "era": "Roman Britain",
+      "tags": [
+        "constantine",
+        "roman empire",
+        "politics",
+        "christianity"
+      ],
+      "media": [],
+      "review_status": "approved",
+      "origin": "manual",
+      "visibility": "public",
+      "status": "active"
+    },
+    {
+      "title": "York Emerges as the Viking City of Jorvik",
+      "id": "york-004",
+      "date_start": "0866-11-01",
+      "date_end": null,
+      "category": "cultural",
+      "description": "In 866 the Great Heathen Army captured York, and the city became Jorvik, one of the most important Viking urban centres in Britain. It developed into a thriving hub of trade, craft, and cultural exchange linking the British Isles with Scandinavia and beyond.",
+      "significance": "This transformed York from a former Roman stronghold into one of the great Viking cities of the North.",
+      "source_url": "https://www.jorvikvikingcentre.co.uk/about-jorvik/",
+      "confidence": 5,
+      "lat": 53.9623,
+      "lng": -1.0819,
+      "area_note": "Anchored to central York as the wider core of Viking Jorvik.",
+      "era": "Viking York",
+      "tags": [
+        "viking",
+        "jorvik",
+        "trade",
+        "settlement"
+      ],
+      "media": [],
+      "review_status": "approved",
+      "origin": "manual",
+      "visibility": "public",
+      "status": "active"
+    },
+    {
+      "title": "Norman York Rebuilt Around Castle and Minster Precinct",
+      "id": "york-005",
+      "date_start": "1068-01-01",
+      "date_end": "1100-12-31",
+      "category": "construction",
+      "description": "After the Norman Conquest, York was reshaped through military and ecclesiastical building. Castles, churches, and reorganised urban spaces asserted Norman control and tied York more tightly into the new kingdom.",
+      "significance": "The Norman period redefined York’s political and architectural identity.",
+      "source_url": "https://www.yorkminster.org/discover/history/",
+      "confidence": 4,
+      "lat": 53.9623,
+      "lng": -1.0819,
+      "area_note": "Central York and Minster precinct as the symbolic heart of Norman authority.",
+      "era": "Norman York",
+      "tags": [
+        "norman",
+        "medieval",
+        "castle",
+        "minster"
+      ],
+      "media": [],
+      "review_status": "approved",
+      "origin": "manual",
+      "visibility": "public",
+      "status": "active"
+    },
+    {
+      "title": "Construction of the Present York Minster Begins",
+      "id": "york-006",
+      "date_start": "1220-01-01",
+      "date_end": "1472-01-01",
+      "category": "construction",
+      "description": "Work on the present Gothic York Minster began in the early thirteenth century and continued for around 250 years. The cathedral became one of the most magnificent ecclesiastical buildings in northern Europe, with extraordinary stained glass and a skyline that still defines the city.",
+      "significance": "York Minster became the architectural and spiritual centrepiece of northern England.",
+      "source_url": "https://yorkminster.org/discover/history/",
+      "confidence": 5,
+      "lat": 53.9623,
+      "lng": -1.0819,
+      "area_note": "Directly anchored to York Minster.",
+      "era": "Medieval York",
+      "tags": [
+        "cathedral",
+        "gothic",
+        "church",
+        "architecture"
+      ],
+      "media": [],
+      "review_status": "approved",
+      "origin": "manual",
+      "visibility": "public",
+      "status": "active"
+    },
+    {
+      "title": "The Shambles Flourish as a Medieval Market Street",
+      "id": "york-007",
+      "date_start": "1400-01-01",
+      "date_end": "1500-12-31",
+      "category": "cultural",
+      "description": "The Shambles became one of York’s most famous medieval streets, known especially for butchers’ shops and overhanging timber-framed buildings. Its physical survival gives modern visitors a vivid sense of the density, commerce, and daily life of late medieval York.",
+      "significance": "This is one of the clearest surviving windows into York’s medieval urban life.",
+      "source_url": "https://www.visityork.org/business-directory/the-shambles",
+      "confidence": 4,
+      "lat": 53.9609,
+      "lng": -1.0805,
+      "area_note": "Slightly south of the Minster, still within the central York pack area.",
+      "era": "Medieval York",
+      "tags": [
+        "market",
+        "medieval",
+        "shambles",
+        "trade"
+      ],
+      "media": [],
+      "review_status": "approved",
+      "origin": "manual",
+      "visibility": "public",
+      "status": "active"
+    },
+    {
+      "title": "York Besieged During the English Civil War",
+      "id": "york-008",
+      "date_start": "1644-04-01",
+      "date_end": "1644-07-16",
+      "category": "conflict",
+      "description": "York was besieged during the English Civil War as Parliamentarian and allied forces sought to break Royalist control of the north. The city’s fall after the Battle of Marston Moor marked a decisive weakening of Royalist power in northern England.",
+      "significance": "York was a strategic prize in one of the defining conflicts of early modern Britain.",
+      "source_url": "https://www.britishbattles.com/english-civil-war/battle-of-marston-moor/",
+      "confidence": 4,
+      "lat": 53.9623,
+      "lng": -1.0819,
+      "area_note": "Anchored to the city centre as the focus of the siege.",
+      "era": "Early Modern York",
+      "tags": [
+        "civil war",
+        "siege",
+        "royalist",
+        "parliamentarian"
+      ],
+      "media": [],
+      "review_status": "approved",
+      "origin": "manual",
+      "visibility": "public",
+      "status": "active"
+    },
+    {
+      "title": "York Becomes a Major Railway Centre",
+      "id": "york-009",
+      "date_start": "1840-01-01",
+      "date_end": "1877-12-31",
+      "category": "transport",
+      "description": "In the nineteenth century York was transformed by the railway age. The city became a major rail hub, with engineering, administration, and transport links reshaping its economy and identity. Victorian railway expansion linked York to the industrial future while preserving its ancient core.",
+      "significance": "Railways gave York a new national importance in the industrial age.",
+      "source_url": "https://www.railwaymuseum.org.uk/objects-and-stories/history-of-york-railway-station",
+      "confidence": 4,
+      "lat": 53.9586,
+      "lng": -1.093,
+      "area_note": "Anchored to central York with emphasis on the railway corridor west of the Minster.",
+      "era": "Victorian York",
+      "tags": [
+        "railway",
+        "victorian",
+        "industry",
+        "transport"
+      ],
+      "media": [],
+      "review_status": "approved",
+      "origin": "manual",
+      "visibility": "public",
+      "status": "active"
+    },
+    {
+      "title": "York Minster Damaged in the Baedeker Raids",
+      "id": "york-010",
+      "date_start": "1942-04-29",
+      "date_end": null,
+      "category": "conflict",
+      "description": "During the Second World War, York was targeted in the Baedeker Raids, German bombing attacks aimed at places of cultural importance. York Minster was damaged, and the attack underscored the symbolic value of the city’s historic fabric.",
+      "significance": "The raid showed that York’s heritage was considered nationally significant even in wartime.",
+      "source_url": "https://www.iwm.org.uk/history/the-baedeker-raids",
+      "confidence": 4,
+      "lat": 53.9623,
+      "lng": -1.0819,
+      "area_note": "Directly associated with York Minster and central York.",
+      "era": "Wartime York",
+      "tags": [
+        "ww2",
+        "bombing",
+        "baedeker raids",
+        "minster"
+      ],
+      "media": [],
+      "review_status": "approved",
+      "origin": "manual",
+      "visibility": "public",
+      "status": "active"
+    },
+    {
+      "title": "Coppergate Excavations Reveal Viking York",
+      "id": "york-011",
+      "date_start": "1976-01-01",
+      "date_end": "1981-12-31",
+      "category": "discovery",
+      "description": "Excavations at Coppergate uncovered exceptionally well-preserved Viking-age remains, including buildings, tools, textiles, leather, and everyday waste. The discoveries transformed understanding of urban Viking life and later inspired the Jorvik Viking Centre.",
+      "significance": "These excavations made York one of the most important archaeological windows into the Viking world.",
+      "source_url": "https://www.jorvikvikingcentre.co.uk/about-jorvik/",
+      "confidence": 5,
+      "lat": 53.9587,
+      "lng": -1.0803,
+      "area_note": "Within central York, slightly south of the Minster core.",
+      "era": "Modern Archaeology",
+      "tags": [
+        "archaeology",
+        "viking",
+        "coppergate",
+        "jorvik"
+      ],
+      "media": [],
+      "review_status": "approved",
+      "origin": "manual",
+      "visibility": "public",
+      "status": "active"
+    },
+    {
+      "title": "York Develops into a Leading Heritage Tourism City",
+      "id": "york-012",
+      "date_start": "1980-01-01",
+      "date_end": null,
+      "category": "cultural",
+      "description": "In the late twentieth and early twenty-first centuries, York increasingly embraced its layered identity as Roman, Viking, medieval, railway, and wartime city. Its historic streets, museums, city walls, and Minster made it one of Britain’s most recognisable heritage destinations.",
+      "significance": "York’s modern identity is built on preserving and interpreting its long historical depth.",
+      "source_url": "https://www.visityork.org/",
+      "confidence": 4,
+      "lat": 53.9623,
+      "lng": -1.0819,
+      "area_note": "Anchored to central York as the symbolic heart of the visitor experience.",
+      "era": "Contemporary York",
+      "tags": [
+        "tourism",
+        "heritage",
+        "city identity",
+        "preservation"
+      ],
+      "media": [],
+      "review_status": "approved",
+      "origin": "manual",
+      "visibility": "public",
+      "status": "active"
+    },
+    {
+      "title": "Minster Yard",
+      "id": "candidate-york-009",
+      "date_start": null,
+      "date_end": null,
+      "category": "religion",
+      "description": "Minster Yard is a street in the city centre of York, England. It runs along the southern, eastern and northeastern sides of York Minster, for which it is named.",
+      "significance": "Candidate generated from Wikipedia/Wikidata for York Minster and Central York. Review dates, relevance, and classification before import.",
+      "source_url": "https://en.wikipedia.org/wiki/Minster_Yard",
+      "confidence": 2,
+      "lat": 53.9623,
+      "lng": -1.0819,
+      "area_note": "Generated near York Minster and Central York. Review exact relevance to place.",
+      "era": "Medieval Britain",
+      "tags": [
+        "york-minster",
+        "york minster and central york",
+        "street in york, england",
+        "Q79007",
+        "Q108660756",
+        "street in York, England"
+      ],
+      "media": [
+        {
+          "type": "image",
+          "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Minster_Yard_%288170027172%29.jpg/330px-Minster_Yard_%288170027172%29.jpg",
+          "caption": "Minster Yard"
+        }
+      ],
+      "review_status": "approved",
+      "origin": "generated",
+      "visibility": "public",
+      "status": "active"
+    },
+    {
+      "title": "York Minster",
+      "id": "candidate-york-001",
+      "date_start": null,
+      "date_end": null,
+      "category": "cultural",
+      "description": "York Minster, formally the Cathedral and Metropolitical Church of Saint Peter in York, is an Anglican cathedral in the city of York, North Yorkshire, England. The minster is the seat of the archbishop of York, the second-highest office of the Church of England, and is the mother church for the diocese of York and the province of York. It is administered by its dean and chapter. The minster is a Grade I listed building and a scheduled monument.",
+      "significance": "Candidate generated from Wikipedia search for York Minster and Central York. Review and refine before import.",
+      "source_url": "https://en.wikipedia.org/wiki/York_Minster",
+      "confidence": 2,
+      "lat": 53.9623,
+      "lng": -1.0819,
+      "area_note": "Generated near York Minster and Central York. Review exact relevance to place.",
+      "era": "Unclassified",
+      "tags": [
+        "york-minster",
+        "york minster and central york",
+        "grade i listed cathedral in england"
+      ],
+      "media": [
+        {
+          "type": "image",
+          "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/York_Minster_%282797690%29.jpg/330px-York_Minster_%282797690%29.jpg",
+          "caption": "York Minster"
+        }
+      ],
+      "review_status": "approved",
+      "origin": "generated",
+      "visibility": "public",
+      "status": "active"
+    },
+    {
+      "title": "Archbishop of York",
+      "id": "candidate-york-002",
+      "date_start": null,
+      "date_end": null,
+      "category": "cultural",
+      "description": "The archbishop of York is a senior bishop in the Church of England, second only to the archbishop of Canterbury. The archbishop is the diocesan bishop of the Diocese of York and the metropolitan bishop of the province of York, which covers the northern regions of England as well as the Isle of Man.",
+      "significance": "Candidate generated from Wikipedia search for York Minster and Central York. Review and refine before import.",
+      "source_url": "https://en.wikipedia.org/wiki/Archbishop_of_York",
+      "confidence": 2,
+      "lat": 53.9623,
+      "lng": -1.0819,
+      "area_note": "Generated near York Minster and Central York. Review exact relevance to place.",
+      "era": "Unclassified",
+      "tags": [
+        "york-minster",
+        "york minster and central york",
+        "senior bishop in the church of england"
+      ],
+      "media": [
+        {
+          "type": "image",
+          "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Installation_of_the_Bishops_of_Barking_and_Colchester_%2814983891360%29_%28Stephen_Cottrell_cropped%29.jpg/330px-Installation_of_the_Bishops_of_Barking_and_Colchester_%2814983891360%29_%28Stephen_Cottrell_cropped%29.jpg",
+          "caption": "Archbishop of York"
+        }
+      ],
+      "review_status": "approved",
+      "origin": "generated",
+      "visibility": "public",
+      "status": "active"
+    },
+    {
+      "title": "Five Sisters Window Installed",
+      "id": "candidate-york-006",
+      "date_start": "1250-01-01",
+      "date_end": null,
+      "category": "art",
+      "description": "York Minster's Five Sisters window contains the largest expanse of 13th century grisaille glass in the world. It was built c.1250–1260 and is located in the north wall of the north transept of York Minster. The window features in the Guinness Book of Records as \"the largest ancient stained-glass window in the British Isles.\"",
+      "significance": "Candidate generated from Wikipedia search for York Minster and Central York. Review and refine before import.",
+      "source_url": "https://en.wikipedia.org/wiki/Five_Sisters_window",
+      "confidence": 2,
+      "lat": 53.9623,
+      "lng": -1.0819,
+      "area_note": "Generated near York Minster and Central York. Review exact relevance to place.",
+      "era": "Medieval York",
+      "tags": [
+        "york-minster",
+        "york minster and central york",
+        "grisaille window in york minster"
+      ],
+      "media": [
+        {
+          "type": "image",
+          "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/62/York_Minster_window_n16_%22The_Five_sisters%22_%2816157008236%29.jpg/330px-York_Minster_window_n16_%22The_Five_sisters%22_%2816157008236%29.jpg",
+          "caption": "Five Sisters window"
+        }
+      ],
+      "review_status": "approved",
+      "origin": "generated",
+      "visibility": "public",
+      "status": "active"
+    },
+    {
+      "id": "candidate-4ee4b6e8-da21-4040-8e80-ab9b454cd358",
+      "title": "York",
+      "date_start": "0071-00-00",
+      "date_end": null,
+      "category": "ceremony",
+      "description": "York is a cathedral city in North Yorkshire, England, with Roman origins, sited at the confluence of the rivers Ouse and Foss. It has many historic buildings and other structures, including the minster, castle and city walls, all of which are Grade I listed. It is the traditional county town of Yorkshire, and the administrative centre of the City of York district. It is located 27 miles (43 km) north-east of Leeds, 90 miles (140 km) south of Newcastle upon Tyne and 207 miles (333 km) north of London. York's built-up area had a recorded population of 141,685 at the 2021 census.",
+      "significance": "Candidate generated from Wikipedia/Wikidata for York Minster and Central York. Review dates, relevance, and classification before import.",
+      "source_url": "https://en.wikipedia.org/wiki/York",
+      "confidence": 5,
+      "lat": 53.9623,
+      "lng": -1.0819,
+      "area_note": "Generated near York Minster and Central York. Review exact relevance to place.",
+      "era": "Roman Britain",
+      "tags": [
+        "york-minster",
+        "york minster and central york",
+        "city in north yorkshire, england",
+        "12th century English pogroms",
+        "1954–55 FA Cup",
+        "1990s UK local government reform",
+        "1st (United Kingdom) Division",
+        "2010 United Kingdom general election",
+        "Q1357964",
+        "Q1549591",
+        "Q7897276",
+        "Q515",
+        "Q42462",
+        "city in North Yorkshire, England, United Kingdom"
+      ],
+      "media": [
+        {
+          "type": "image",
+          "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/York_Minster_%282797690%29.jpg/330px-York_Minster_%282797690%29.jpg",
+          "caption": "York"
+        }
+      ],
+      "review_status": "approved",
+      "origin": "generated",
+      "visibility": "public",
+      "status": "active"
+    },
+    {
+      "id": "candidate-ad558fea-4e43-496d-817b-8e55574da250",
+      "title": "York Deanery",
+      "date_start": "0120-01-01",
+      "date_end": "0400-01-01",
+      "category": "religion",
+      "description": "York Deanery is an historic building in York, England. It has been designated a Grade II listed building by Historic England. The property is located around 400 feet (120 m) to the north of York Minster, on Minster Yard, and behind York Minster Library.",
+      "significance": "Candidate generated from Wikipedia/Wikidata for York Minster and Central York. Review dates, relevance, and classification before import.",
+      "source_url": "https://en.wikipedia.org/wiki/York_Deanery",
+      "confidence": 5,
+      "lat": 53.9623,
+      "lng": -1.0819,
+      "area_note": "Generated near York Minster and Central York. Review exact relevance to place.",
+      "era": "Medieval Britain",
+      "tags": [
+        "york-minster",
+        "york minster and central york",
+        "historic site in york, england",
+        "Ashlar",
+        "Coat of arms",
+        "Dead end (street)",
+        "Dean of York",
+        "Diocese of York",
+        "Q41176",
+        "Q26548625",
+        "Grade II listed building in York, England, UK"
+      ],
+      "media": [
+        {
+          "type": "image",
+          "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2b/Deanery_Minster_Yard_York_02.jpg/330px-Deanery_Minster_Yard_York_02.jpg",
+          "caption": "York Deanery"
+        }
+      ],
+      "review_status": "approved",
+      "origin": "generated",
+      "visibility": "public",
+      "status": "active"
+    },
+    {
+      "id": "candidate-86ba7c60-456e-46a9-9685-b3a5a9ab930a",
+      "title": "Southwell Minster",
+      "date_start": "1201-01-17",
+      "date_end": null,
+      "category": "religion",
+      "description": "Southwell Minster, strictly since 1884 Southwell Cathedral, and formally the Cathedral and Parish Church of the Blessed Virgin Mary, is a Church of England cathedral in Southwell, Nottinghamshire, England. The cathedral is the seat of the bishop of Southwell and Nottingham and the mother church of the diocese of Southwell and Nottingham; it is governed by a dean and chapter. It is a grade I listed building.",
+      "significance": "Candidate generated from Wikipedia/Wikidata for York Minster and Central York. Review dates, relevance, and classification before import.",
+      "source_url": "https://en.wikipedia.org/wiki/Southwell_Minster",
+      "confidence": 5,
+      "lat": 53.9623,
+      "lng": -1.0819,
+      "area_note": "Generated near York Minster and Central York. Review exact relevance to place.",
+      "era": "Medieval Britain",
+      "tags": [
+        "york-minster",
+        "york minster and central york",
+        "church in nottinghamshire, england",
+        "34 & 35 Hen. 8",
+        "A tour thro' the Whole Island of Great Britain",
+        "Albert Seward",
+        "Alison Milbank",
+        "Anglo-Saxon architecture",
+        "Q56242250",
+        "Q3492345",
+        "Grade I listed cathedral in Southwell, United Kingdom"
+      ],
+      "media": [
+        {
+          "type": "image",
+          "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Southwell_Minster_2016_-_north-west_view.jpg/330px-Southwell_Minster_2016_-_north-west_view.jpg",
+          "caption": "Southwell Minster"
+        }
+      ],
+      "review_status": "approved",
+      "origin": "generated",
+      "visibility": "public",
+      "status": "active"
+    },
+    {
+      "id": "candidate-69359357-a107-428d-b2f9-77dfbea1c900",
+      "title": "York Minster",
+      "date_start": "1220-01-17",
+      "date_end": null,
+      "category": "religion",
+      "description": "York Minster, formally the Cathedral and Metropolitical Church of Saint Peter in York, is an Anglican cathedral in the city of York, North Yorkshire, England. The minster is the seat of the archbishop of York, the second-highest office of the Church of England, and is the mother church for the diocese of York and the province of York. It is administered by its dean and chapter. The minster is a Grade I listed building and a scheduled monument.",
+      "significance": "Candidate generated from Wikipedia/Wikidata for York Minster and Central York. Review dates, relevance, and classification before import.",
+      "source_url": "https://en.wikipedia.org/wiki/York_Minster",
+      "confidence": 5,
+      "lat": 53.9623,
+      "lng": -1.0819,
+      "area_note": "Generated near York Minster and Central York. Review exact relevance to place.",
+      "era": "Medieval Britain",
+      "tags": [
+        "york-minster",
+        "york minster and central york",
+        "grade i listed cathedral in england",
+        "A. L. Moore",
+        "Abraham and Bernard van Linge",
+        "Admiral",
+        "Aestheticism",
+        "Alan Richardson (priest)",
+        "Q16970",
+        "Q2977",
+        "Q252575",
+        "cathedral of York, North Yorkshire, England, UK"
+      ],
+      "media": [
+        {
+          "type": "image",
+          "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/York_Minster_%282797690%29.jpg/330px-York_Minster_%282797690%29.jpg",
+          "caption": "York Minster"
+        }
+      ],
+      "review_status": "approved",
+      "origin": "generated",
+      "visibility": "public",
+      "status": "active"
+    },
+    {
+      "id": "candidate-8f3302e3-5774-4947-a6c4-289c3847f99f",
+      "title": "Five Sisters window",
+      "date_start": "1250-01-01",
+      "date_end": "1260-01-01",
+      "category": "religion",
+      "description": "York Minster's Five Sisters window contains the largest expanse of 13th century grisaille glass in the world. It was built c.1250–1260 and is located in the north wall of the north transept of York Minster. The window features in the Guinness Book of Records as \"the largest ancient stained-glass window in the British Isles.\"",
+      "significance": "Candidate generated from Wikipedia/Wikidata for York Minster and Central York. Review dates, relevance, and classification before import.",
+      "source_url": "https://en.wikipedia.org/wiki/Five_Sisters_window",
+      "confidence": 5,
+      "lat": 53.9623,
+      "lng": -1.0819,
+      "area_note": "Generated near York Minster and Central York. Review exact relevance to place.",
+      "era": "Medieval Britain",
+      "tags": [
+        "york-minster",
+        "york minster and central york",
+        "grisaille window in york minster",
+        "Almyra Gray",
+        "Auckland Star",
+        "Australian Army Nursing Service",
+        "Australian Red Cross",
+        "Bell-ringer",
+        "Q4502142",
+        "Q119348747",
+        "five Sisters window, York Minster"
+      ],
+      "media": [
+        {
+          "type": "image",
+          "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/62/York_Minster_window_n16_%22The_Five_sisters%22_%2816157008236%29.jpg/330px-York_Minster_window_n16_%22The_Five_sisters%22_%2816157008236%29.jpg",
+          "caption": "Five Sisters window"
+        }
+      ],
+      "review_status": "approved",
+      "origin": "generated",
+      "visibility": "public",
+      "status": "active"
+    },
+    {
+      "id": "candidate-d4a97271-2247-49b8-b336-8b03ad8a0927",
+      "title": "Archbishop of York",
+      "date_start": "1559-00-00",
+      "date_end": null,
+      "category": "religion",
+      "description": "The archbishop of York is a senior bishop in the Church of England, second only to the archbishop of Canterbury. The archbishop is the diocesan bishop of the Diocese of York and the metropolitan bishop of the province of York, which covers the northern regions of England as well as the Isle of Man.",
+      "significance": "Candidate generated from Wikipedia/Wikidata for York Minster and Central York. Review dates, relevance, and classification before import.",
+      "source_url": "https://en.wikipedia.org/wiki/Archbishop_of_York",
+      "confidence": 5,
+      "lat": 53.9623,
+      "lng": -1.0819,
+      "area_note": "Generated near York Minster and Central York. Review exact relevance to place.",
+      "era": "Early Modern Britain",
+      "tags": [
+        "york-minster",
+        "york minster and central york",
+        "senior bishop in the church of england",
+        "Abbot",
+        "Abbot of Melrose",
+        "Accepted Frewen",
+        "Accord of Winchester",
+        "Alexander Neville (bishop)",
+        "Q124515690",
+        "Q1363910",
+        "senior bishop in the Church of England"
+      ],
+      "media": [
+        {
+          "type": "image",
+          "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Installation_of_the_Bishops_of_Barking_and_Colchester_%2814983891360%29_%28Stephen_Cottrell_cropped%29.jpg/330px-Installation_of_the_Bishops_of_Barking_and_Colchester_%2814983891360%29_%28Stephen_Cottrell_cropped%29.jpg",
+          "caption": "Archbishop of York"
+        }
+      ],
+      "review_status": "approved",
+      "origin": "generated",
+      "visibility": "public",
+      "status": "active"
+    }
+  ],
+  "candidates": [],
+  "metadata": {
+    "created_by": "sam",
+    "review_status": "draft",
+    "source_mix": [
+      "manual",
+      "institutional sources"
+    ],
+    "notes": "First showcase pack for OnTheSpot. Designed to demonstrate multi-era place layering in a single urban location."
+  }
+}

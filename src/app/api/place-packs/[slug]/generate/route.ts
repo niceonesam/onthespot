@@ -1,0 +1,28 @@
+import { NextResponse } from "next/server";
+import { generateEntries } from "../../../../../../tools/place-pack.mjs";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ slug: string }> }
+) {
+  try {
+    const { slug } = await params;
+    const body = await request.json().catch(() => ({}));
+
+    const result = await generateEntries({
+      slug,
+      place: body?.place,
+      query: body?.query,
+      limit: body?.limit,
+    });
+
+    return NextResponse.json({ ok: true, ...result });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to generate candidates";
+    return NextResponse.json({ ok: false, error: message }, { status: 400 });
+  }
+}
