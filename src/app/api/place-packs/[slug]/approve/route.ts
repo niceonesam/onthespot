@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { approveCandidate } from "../../../../../../tools/place-pack.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,6 +10,9 @@ export async function POST(
   try {
     const { slug } = await params;
     const body = await request.json();
+    const { approveCandidate } = await import(
+      "../../../../../../tools/place-pack.mjs"
+    );
 
     const result = approveCandidate({
       slug,
