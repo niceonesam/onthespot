@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { generateEntries } from "../../../../../../tools/place-pack.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,6 +10,10 @@ export async function POST(
   try {
     const { slug } = await params;
     const body = await request.json().catch(() => ({}));
+
+    const { generateEntries } = await import(
+      "../../../../../../tools/place-pack.mjs"
+    );
 
     const result = await generateEntries({
       slug,
