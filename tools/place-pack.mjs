@@ -316,6 +316,67 @@ function extractYearCandidates(...values) {
   return matches.filter((y) => y >= 1 && y <= 9999);
 }
 
+function shouldInferFallbackDates({ title, extract, wikiDescription, wikidataDescription, category }) {
+  const text = [title, extract, wikiDescription, wikidataDescription]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  const broadPlaceSignals = [
+    /\bcoast\b/,
+    /\bcity\b/,
+    /\btown\b/,
+    /\bvillage\b/,
+    /\bcounty\b/,
+    /\bregion\b/,
+    /\bdistrict\b/,
+    /\bheadland\b/,
+    /\briver\b/,
+    /\bvalley\b/,
+    /\bfloodplain\b/,
+    /\bpark\b/,
+    /\bstreet\b/,
+    /\byard\b/,
+    /\broad\b/,
+    /\bneighbourhood\b/,
+    /\bneighborhood\b/,
+    /\bisland\b/,
+    /\bpeninsula\b/,
+    /\bbay\b/,
+  ];
+
+  const eventOrBuildSignals = [
+    /\bconstruction\b/,
+    /\bbuilt\b/,
+    /\bbegins\b/,
+    /\bfounded\b/,
+    /\bestablished\b/,
+    /\bopened\b/,
+    /\bcompleted\b/,
+    /\bdied\b/,
+    /\bbattle\b/,
+    /\bsiege\b/,
+    /\braid\b/,
+    /\bexcavation\b/,
+    /\bdiscovered\b/,
+    /\bproclaimed\b/,
+    /\bcoronation\b/,
+    /\bfire\b/,
+    /\brestoration\b/,
+  ];
+
+  const looksBroadPlace = broadPlaceSignals.some((pattern) => pattern.test(text));
+  const looksSpecificEventOrBuild =
+    eventOrBuildSignals.some((pattern) => pattern.test(text)) ||
+    ["construction", "conflict", "death", "discovery", "political", "transport", "art", "religion"].includes(category);
+
+  if (looksBroadPlace && !looksSpecificEventOrBuild) {
+    return false;
+  }
+
+  return true;
+}
+
 function parseWikidataTimeValue(value) {
   const time = value?.mainsnak?.datavalue?.value?.time;
   if (typeof time !== "string") return null;
@@ -559,17 +620,7 @@ async function buildGeneratedEntryMetadata({ title, extract, wikiDescription }) 
 
   let dateStart = getFirstClaimDate(claims, ["P585", "P571", "P580", "P577", "P569", "P1619"]);
   let dateEnd = getFirstClaimDate(claims, ["P582", "P570"]);
-
-  if (!dateStart) {
-    const fallbackYears = extractYearCandidates(title, extract, wikiDescription, wikidataDescription);
-    const uniqueYears = [...new Set(fallbackYears)].sort((a, b) => a - b);
-    if (uniqueYears.length > 0) {
-      dateStart = yearToDate(uniqueYears[0]);
-      if (!dateEnd && uniqueYears.length > 1 && uniqueYears[1] >= uniqueYears[0]) {
-        dateEnd = yearToDate(uniqueYears[1]);
-      }
-    }
-  }
+  let date_inferred = false;
 
   const category = inferCategoryFromText({
     title,
@@ -578,6 +629,27 @@ async function buildGeneratedEntryMetadata({ title, extract, wikiDescription }) 
     wikidataDescription,
     p31Ids,
   });
+
+  if (
+    !dateStart &&
+    shouldInferFallbackDates({
+      title,
+      extract,
+      wikiDescription,
+      wikidataDescription,
+      category,
+    })
+  ) {
+    const fallbackYears = extractYearCandidates(title, extract, wikiDescription, wikidataDescription);
+    const uniqueYears = [...new Set(fallbackYears)].sort((a, b) => a - b);
+    if (uniqueYears.length > 0) {
+      dateStart = yearToDate(uniqueYears[0]);
+      date_inferred = true;
+      if (!dateEnd && uniqueYears.length > 1 && uniqueYears[1] >= uniqueYears[0]) {
+        dateEnd = yearToDate(uniqueYears[1]);
+      }
+    }
+  }
 
   const temporal = inferTemporalMetadataFromText({
     title,
@@ -598,6 +670,7 @@ async function buildGeneratedEntryMetadata({ title, extract, wikiDescription }) 
     date_end: dateEnd,
     category,
     era,
+    date_inferred,
     time_scale: temporal.time_scale,
     years_ago_start: temporal.years_ago_start,
     years_ago_end: temporal.years_ago_end,
@@ -742,6 +815,7 @@ async function generateEntries({ slug, place, query, limit }) {
       title,
       date_start: inferred.date_start,
       date_end: inferred.date_end,
+      date_inferred: inferred.date_inferred,
       category: inferred.category,
       description: extract,
       significance: `Candidate generated from Wikipedia/Wikidata for ${searchQuery}. Review dates, relevance, and classification before import.`,

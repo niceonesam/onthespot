@@ -1,7 +1,7 @@
 // The full file is replaced by the user-provided contents.
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
 
@@ -16,6 +16,7 @@ type PackEntry = {
   title: string;
   date_start: string | null;
   date_end: string | null;
+  date_inferred?: boolean;
   time_scale?: "geological" | "historical" | null;
   years_ago_start?: number | null;
   years_ago_end?: number | null;
@@ -210,6 +211,7 @@ export default function PlacePackEditor({ slug }: { slug: string }) {
     Record<string, CandidateDraft>
   >({});
   const [notice, setNotice] = useState<string | null>(null);
+  const approvedEntryRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const loadPack = useCallback(async () => {
     setLoading(true);
@@ -295,6 +297,28 @@ export default function PlacePackEditor({ slug }: { slug: string }) {
 
     return `/?${params.toString()}`;
   }, [pack]);
+
+  function handleTimelineEntryClick(entryId: string) {
+    const el = approvedEntryRefs.current[entryId];
+    if (!el) return;
+
+    el.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+
+    el.animate(
+      [
+        { boxShadow: "0 0 0 0 rgba(0, 219, 193, 0)", transform: "translateY(0px)" },
+        { boxShadow: "0 0 0 4px rgba(0, 219, 193, 0.20)", transform: "translateY(-1px)" },
+        { boxShadow: "0 0 0 0 rgba(0, 219, 193, 0)", transform: "translateY(0px)" },
+      ],
+      {
+        duration: 900,
+        easing: "ease-out",
+      }
+    );
+  }
 
   function patchDraft(id: string, patch: Partial<CandidateDraft>) {
     setCandidateDrafts((prev) => ({
@@ -726,8 +750,11 @@ export default function PlacePackEditor({ slug }: { slug: string }) {
                 />
 
                 {timelineEntries.items.map(({ entry, year }) => (
-                  <div
+                  <button
                     key={entry.id}
+                    type="button"
+                    onClick={() => handleTimelineEntryClick(entry.id)}
+                    title="Jump to approved entry"
                     style={{
                       position: "relative",
                       display: "grid",
@@ -736,6 +763,9 @@ export default function PlacePackEditor({ slug }: { slug: string }) {
                       borderRadius: 14,
                       border: "1px solid rgba(0,0,0,0.08)",
                       background: "rgba(0,0,0,0.02)",
+                      textAlign: "left",
+                      cursor: "pointer",
+                      transition: "transform 140ms ease, box-shadow 180ms ease, border-color 180ms ease",
                     }}
                   >
                     <div
@@ -784,7 +814,7 @@ export default function PlacePackEditor({ slug }: { slug: string }) {
                     <div style={{ fontSize: 13, color: "#444", lineHeight: 1.4 }}>
                       {entry.significance}
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
@@ -876,7 +906,7 @@ export default function PlacePackEditor({ slug }: { slug: string }) {
                 borderRadius: 18,
                 overflow: "hidden",
                 border: "1px solid rgba(0,0,0,0.08)",
-                minHeight: 360,
+                minHeight: 420,
                 background: "rgba(0,0,0,0.03)",
               }}
             >
@@ -886,12 +916,10 @@ export default function PlacePackEditor({ slug }: { slug: string }) {
                   title={`Mini map preview for ${pack?.place.name ?? slug}`}
                   style={{
                     display: "block",
-                    width: "160%",
+                    width: "100%",
                     height: 420,
                     border: 0,
                     background: "white",
-                    transform: "scale(0.75)",
-                    transformOrigin: "top left",
                   }}
                 />
               ) : (
@@ -946,11 +974,15 @@ export default function PlacePackEditor({ slug }: { slug: string }) {
                 {sortedEntries.map((entry) => (
                   <div
                     key={entry.id}
+                    ref={(el) => {
+                      approvedEntryRefs.current[entry.id] = el;
+                    }}
                     style={{
                       border: "1px solid rgba(0,0,0,0.08)",
                       borderRadius: 16,
                       padding: 14,
                       background: "rgba(0,0,0,0.02)",
+                      scrollMarginTop: 24,
                     }}
                   >
                     <div
@@ -1030,6 +1062,7 @@ export default function PlacePackEditor({ slug }: { slug: string }) {
               <div style={{ display: "grid", gap: 14 }}>
                 {sortedCandidates.map((entry) => {
                   const draft = candidateDrafts[entry.id] ?? emptyDraft(entry);
+                  const showDateInferenceWarning = Boolean(entry.date_inferred && (entry.date_start || entry.date_end));
                   const actionBusy =
                     busyAction === `approve:${entry.id}` ||
                     busyAction === `reject:${entry.id}`;
@@ -1109,6 +1142,23 @@ export default function PlacePackEditor({ slug }: { slug: string }) {
                         {entry.description}
                       </p>
 
+                      {showDateInferenceWarning ? (
+                        <div
+                          style={{
+                            borderRadius: 12,
+                            border: "1px solid rgba(230,179,37,0.32)",
+                            background: "rgba(230,179,37,0.10)",
+                            color: "#6b4f00",
+                            padding: "10px 12px",
+                            fontSize: 13,
+                            lineHeight: 1.4,
+                            fontWeight: 700,
+                          }}
+                        >
+                          Auto-inferred date — verify before approval.
+                        </div>
+                      ) : null}
+
                       <div
                         style={{
                           display: "grid",
@@ -1159,7 +1209,12 @@ export default function PlacePackEditor({ slug }: { slug: string }) {
                             style={{
                               width: "100%",
                               borderRadius: 12,
-                              border: "1px solid rgba(0,0,0,0.14)",
+                              border: showDateInferenceWarning
+                                ? "1px solid rgba(230,179,37,0.34)"
+                                : "1px solid rgba(0,0,0,0.14)",
+                              background: "white",
+                              color: "#111",
+                              opacity: 1,
                               padding: "10px 12px",
                             }}
                           />
@@ -1185,14 +1240,20 @@ export default function PlacePackEditor({ slug }: { slug: string }) {
                         <div>
                           {labelRow("Era", "era")}
                           <input
-                            value={draft.era}
+                            value={draft.date_end}
                             onChange={(e) =>
-                              patchDraft(entry.id, { era: e.target.value })
+                              patchDraft(entry.id, { date_end: e.target.value })
                             }
+                            placeholder="YYYY-MM-DD"
                             style={{
                               width: "100%",
                               borderRadius: 12,
-                              border: "1px solid rgba(0,0,0,0.14)",
+                              border: showDateInferenceWarning
+                                ? "1px solid rgba(230,179,37,0.34)"
+                                : "1px solid rgba(0,0,0,0.14)",
+                              background: "white",
+                              color: "#111",
+                              opacity: 1,
                               padding: "10px 12px",
                             }}
                           />

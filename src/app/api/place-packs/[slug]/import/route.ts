@@ -1,5 +1,3 @@
-
-
 import { NextResponse } from "next/server";
 import fs from "node:fs";
 import path from "node:path";
@@ -13,6 +11,44 @@ function slugify(value: string) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 80);
+}
+
+function makeLocationValue(lat: number, lng: number) {
+  return `SRID=4326;POINT(${lng} ${lat})`;
+}
+
+async function resolveImportUserId(supabase: any) {
+  const envUserId = process.env.PLACE_PACK_IMPORT_USER_ID;
+  if (envUserId) return envUserId;
+
+  const { data: spotRow, error: spotError } = await (supabase as any)
+    .from("spots")
+    .select("user_id")
+    .not("user_id", "is", null)
+    .limit(1)
+    .maybeSingle();
+
+  if (spotError) {
+    console.warn("Could not read existing spot user_id:", spotError.message);
+  }
+
+  if (spotRow?.user_id) return String(spotRow.user_id);
+
+  const { data: profileRow, error: profileError } = await (supabase as any)
+    .from("profiles")
+    .select("id")
+    .limit(1)
+    .maybeSingle();
+
+  if (profileError) {
+    console.warn("Could not read fallback profile id:", profileError.message);
+  }
+
+  if (profileRow?.id) return String(profileRow.id);
+
+  throw new Error(
+    "Could not resolve an import user id. Set PLACE_PACK_IMPORT_USER_ID in Vercel or ensure there is at least one existing spot/profile row."
+  );
 }
 
 function geologicalPeriodLabel(entry: {
@@ -121,9 +157,11 @@ function inferTemporalMetadata(entry: {
     .join(" ")
     .toLowerCase();
 
-  const looksGeological = /(geolog|bedrock|alluvium|glacial|ice age|devensian|triassic|jurassic|cretaceous|pleistocene|holocene|quaternary|paleogene|neogene|permian|carboniferous|devonian|silurian|ordovician|cambrian|floodplain|sediment|sandstone|moraine|younger dryas|late glacial|older dryas|bølling|bolling|allerød|allerod)/.test(
-    text
-  );
+  const looksGeological =
+    /(geolog|bedrock|alluvium|glacial|ice age|devensian|triassic|jurassic|cretaceous|pleistocene|holocene|quaternary|paleogene|neogene|permian|carboniferous|devonian|silurian|ordovician|cambrian|floodplain|sediment|sandstone|moraine|younger dryas|late glacial|older dryas|bølling|bolling|allerød|allerod)/.test(
+      text
+    );
+
   if (!looksGeological) {
     return {
       time_scale: null,
@@ -146,7 +184,7 @@ export async function POST(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
-   const { slug } = await params;
+    const { slug } = await params;
 
     const packPath = path.resolve(
       process.cwd(),
@@ -154,20 +192,17 @@ export async function POST(
     );
 
     if (!fs.existsSync(packPath)) {
-      return NextResponse.json(
-        { error: "Pack not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Pack not found" }, { status: 404 });
     }
 
     const raw = fs.readFileSync(packPath, "utf8");
     const pack = JSON.parse(raw);
 
     const entries = Array.isArray(pack?.entries)
-  ? pack.entries.filter(
-      (entry: any) => (entry?.review_status ?? "approved") === "approved"
-    )
-  : [];
+      ? pack.entries.filter(
+          (entry: any) => (entry?.review_status ?? "approved") === "approved"
+        )
+      : [];
 
     const url = process.env.SUPABASE_URL;
     const key =
@@ -185,10 +220,13 @@ export async function POST(
       auth: { persistSession: false },
     });
 
+    const importUserId = await resolveImportUserId(supabase);
+
     let inserted = 0;
 
     for (const entry of entries) {
       const temporal = inferTemporalMetadata(entry);
+
       const timeKey =
         entry.date_start ??
         (temporal.time_scale === "geological"
@@ -198,15 +236,22 @@ export async function POST(
       const canonicalKey = `${slug}|${timeKey}|${slugify(entry.title)}`;
 
       const payload = {
+        user_id: importUserId,
         title: entry.title,
         description: entry.description,
         category: entry.category,
-        significance: entry.significance,
+        visibility: entry.visibility ?? "public",
+        status: entry.status ?? "active",
+        photo_url: entry.media?.[0]?.url ?? null,
+        what3words: null,
+        location: makeLocationValue(entry.lat, entry.lng),
+        date_start: entry.date_start ?? null,
+        date_end: entry.date_end ?? null,
         source_url: entry.source_url ?? null,
-        lat: entry.lat,
-        lng: entry.lng,
-        era: entry.era ?? null,
-        tags: entry.tags ?? [],
+        confidence: entry.confidence ?? null,
+        import_source: slug,
+        is_imported: true,
+        canonical_key: canonicalKey,
         time_scale: temporal.time_scale,
         years_ago_start: temporal.years_ago_start,
         years_ago_end: temporal.years_ago_end,
@@ -216,21 +261,25 @@ export async function POST(
           years_ago_start: temporal.years_ago_start,
           years_ago_end: temporal.years_ago_end,
         }),
-        canonical_key: canonicalKey,
       };
 
-      const { error } = await supabase.from("spots").upsert(payload, {
+      const { error } = await (supabase as any).from("spots").upsert(payload, {
         onConflict: "canonical_key",
       });
 
-      if (!error) inserted++;
+      if (error) {
+        console.error("Import failed for", entry.title, error);
+        continue;
+      }
+
+      inserted++;
     }
 
     return NextResponse.json({
-        ok: true,
-        inserted,
-        total: entries.length,
-        importedReviewStatus: "approved",
+      ok: true,
+      inserted,
+      total: entries.length,
+      importedReviewStatus: "approved",
     });
   } catch (err: any) {
     return NextResponse.json(

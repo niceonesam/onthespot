@@ -1770,7 +1770,7 @@ export default function HomePage() {
             width: "100%",
             minHeight: 0,
             position: "relative",
-            display: isMobile ? "block" : undefined,
+            display: isMobile || isPlacePackPreview ? "block" : undefined,
           }}
         >
           {/* Nearby list: desktop sidebar, mobile bottom sheet */}
@@ -1836,8 +1836,8 @@ export default function HomePage() {
             }}
             onSelectSpot={selectSpot}
             crosshairPulseKey={crosshairPulseKey}
-            addHref={isPlacePackPreview ? "#" : addHref}
-            isMobile={isPlacePackPreview ? false : isMobile}
+            addHref={addHref}
+            isMobile={isPlacePackPreview ? true : isMobile}
             mobileListSnap={mobileListSnap}
             selectedSheetSnap={selectedSheetSnap}
             selectedSheetIsPeek={selectedSheetIsPeek}
