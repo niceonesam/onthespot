@@ -5,12 +5,92 @@
     "lat": 53.9623,
     "lng": -1.0819,
     "radius_m": 600,
-    "summary": "A deeply layered historic city centre spanning Roman, Viking, medieval, industrial, wartime and modern heritage history.",
+    "summary": "A deeply layered historic city centre spanning deep geological time, Ice Age landscape formation, Roman, Viking, medieval, industrial, wartime and modern heritage history.",
     "country": "United Kingdom",
     "region": "Yorkshire",
     "hero_image_url": null
   },
   "entries": [
+    {
+      "title": "Triassic Sandstone Forms the Deep Foundation Beneath York",
+      "id": "york-geo-001",
+      "date_start": null,
+      "date_end": null,
+      "category": "science",
+      "description": "Long before York existed, river and desert-margin sediments of the Sherwood Sandstone Group were laid down across this part of the Vale of York during the Triassic. That sandstone now forms the deep bedrock foundation beneath much of central York, including the ground below the later city.",
+      "significance": "This is the deep-time geological base beneath York: the buried foundation on which every later landscape, building and historical layer depends.",
+      "source_url": "https://www.bgs.ac.uk/discovering-geology/maps-and-resources/maps/minecraft-3d-geological-models/",
+      "confidence": 4,
+      "lat": 53.9623,
+      "lng": -1.0819,
+      "area_note": "Represents the deep bedrock beneath central York rather than a visible surface outcrop.",
+      "era": "Geological Time",
+      "tags": [
+        "geology",
+        "triassic",
+        "sherwood sandstone",
+        "deep time"
+      ],
+      "media": [],
+      "review_status": "approved",
+      "origin": "manual",
+      "visibility": "public",
+      "status": "active"
+    },
+    {
+      "title": "Ice Sheets Shape the Vale of York and Leave Glacial Deposits",
+      "id": "york-geo-002",
+      "date_start": null,
+      "date_end": null,
+      "category": "science",
+      "description": "During the last Devensian glaciation, ice and meltwater reshaped the Vale of York, leaving tills, sands, gravels and glaciolacustrine deposits across the region. The glacial legacy helped create the low-lying terrain, buried sediment layers and local moraine features that influenced where later settlement could grow.",
+      "significance": "York's setting is not just historical but glacially engineered. The city occupies a landscape heavily shaped by Ice Age processes rather than untouched bedrock alone.",
+      "source_url": "https://webapps.bgs.ac.uk/Memoirs/docs/B06076.html",
+      "confidence": 4,
+      "lat": 53.9623,
+      "lng": -1.0819,
+      "area_note": "Anchored to central York as part of the broader glacial landscape of the Vale of York.",
+      "era": "Geological Time",
+      "tags": [
+        "geology",
+        "ice age",
+        "devensian",
+        "vale of york",
+        "glacial"
+      ],
+      "media": [],
+      "review_status": "approved",
+      "origin": "manual",
+      "visibility": "public",
+      "status": "active"
+    },
+    {
+      "title": "Postglacial Alluvium Builds the Ouse and Foss Floodplain",
+      "id": "york-geo-003",
+      "date_start": null,
+      "date_end": null,
+      "category": "science",
+      "description": "After the ice retreated, the Rivers Ouse and Foss continued to lay down alluvial silts, clays and gravels across the low ground of York. These postglacial floodplain deposits helped create the soft, water-shaped terrain on which the later Roman, Viking and medieval city developed.",
+      "significance": "The meeting of rivers at York is not just a map feature but an ongoing geological process. The city's strategic location also sits on a floodplain built by thousands of years of sedimentation.",
+      "source_url": "https://www.bgs.ac.uk/discovering-geology/maps-and-resources/maps/minecraft-3d-geological-models/",
+      "confidence": 4,
+      "lat": 53.9623,
+      "lng": -1.0819,
+      "area_note": "Anchored to the confluence landscape around central York and the Ouse-Foss floodplain.",
+      "era": "Geological Time",
+      "tags": [
+        "geology",
+        "alluvium",
+        "river ouse",
+        "river foss",
+        "floodplain"
+      ],
+      "media": [],
+      "review_status": "approved",
+      "origin": "manual",
+      "visibility": "public",
+      "status": "active"
+    },
     {
       "title": "Roman Fortress of Eboracum Established",
       "id": "york-001",
@@ -358,68 +438,6 @@
       "status": "active"
     },
     {
-      "title": "York Minster",
-      "id": "candidate-york-001",
-      "date_start": null,
-      "date_end": null,
-      "category": "cultural",
-      "description": "York Minster, formally the Cathedral and Metropolitical Church of Saint Peter in York, is an Anglican cathedral in the city of York, North Yorkshire, England. The minster is the seat of the archbishop of York, the second-highest office of the Church of England, and is the mother church for the diocese of York and the province of York. It is administered by its dean and chapter. The minster is a Grade I listed building and a scheduled monument.",
-      "significance": "Candidate generated from Wikipedia search for York Minster and Central York. Review and refine before import.",
-      "source_url": "https://en.wikipedia.org/wiki/York_Minster",
-      "confidence": 2,
-      "lat": 53.9623,
-      "lng": -1.0819,
-      "area_note": "Generated near York Minster and Central York. Review exact relevance to place.",
-      "era": "Unclassified",
-      "tags": [
-        "york-minster",
-        "york minster and central york",
-        "grade i listed cathedral in england"
-      ],
-      "media": [
-        {
-          "type": "image",
-          "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/York_Minster_%282797690%29.jpg/330px-York_Minster_%282797690%29.jpg",
-          "caption": "York Minster"
-        }
-      ],
-      "review_status": "approved",
-      "origin": "generated",
-      "visibility": "public",
-      "status": "active"
-    },
-    {
-      "title": "Archbishop of York",
-      "id": "candidate-york-002",
-      "date_start": null,
-      "date_end": null,
-      "category": "cultural",
-      "description": "The archbishop of York is a senior bishop in the Church of England, second only to the archbishop of Canterbury. The archbishop is the diocesan bishop of the Diocese of York and the metropolitan bishop of the province of York, which covers the northern regions of England as well as the Isle of Man.",
-      "significance": "Candidate generated from Wikipedia search for York Minster and Central York. Review and refine before import.",
-      "source_url": "https://en.wikipedia.org/wiki/Archbishop_of_York",
-      "confidence": 2,
-      "lat": 53.9623,
-      "lng": -1.0819,
-      "area_note": "Generated near York Minster and Central York. Review exact relevance to place.",
-      "era": "Unclassified",
-      "tags": [
-        "york-minster",
-        "york minster and central york",
-        "senior bishop in the church of england"
-      ],
-      "media": [
-        {
-          "type": "image",
-          "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Installation_of_the_Bishops_of_Barking_and_Colchester_%2814983891360%29_%28Stephen_Cottrell_cropped%29.jpg/330px-Installation_of_the_Bishops_of_Barking_and_Colchester_%2814983891360%29_%28Stephen_Cottrell_cropped%29.jpg",
-          "caption": "Archbishop of York"
-        }
-      ],
-      "review_status": "approved",
-      "origin": "generated",
-      "visibility": "public",
-      "status": "active"
-    },
-    {
       "title": "Five Sisters Window Installed",
       "id": "candidate-york-006",
       "date_start": "1250-01-01",
@@ -443,244 +461,6 @@
           "type": "image",
           "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/62/York_Minster_window_n16_%22The_Five_sisters%22_%2816157008236%29.jpg/330px-York_Minster_window_n16_%22The_Five_sisters%22_%2816157008236%29.jpg",
           "caption": "Five Sisters window"
-        }
-      ],
-      "review_status": "approved",
-      "origin": "generated",
-      "visibility": "public",
-      "status": "active"
-    },
-    {
-      "id": "candidate-4ee4b6e8-da21-4040-8e80-ab9b454cd358",
-      "title": "York",
-      "date_start": "0071-00-00",
-      "date_end": null,
-      "category": "ceremony",
-      "description": "York is a cathedral city in North Yorkshire, England, with Roman origins, sited at the confluence of the rivers Ouse and Foss. It has many historic buildings and other structures, including the minster, castle and city walls, all of which are Grade I listed. It is the traditional county town of Yorkshire, and the administrative centre of the City of York district. It is located 27 miles (43 km) north-east of Leeds, 90 miles (140 km) south of Newcastle upon Tyne and 207 miles (333 km) north of London. York's built-up area had a recorded population of 141,685 at the 2021 census.",
-      "significance": "Candidate generated from Wikipedia/Wikidata for York Minster and Central York. Review dates, relevance, and classification before import.",
-      "source_url": "https://en.wikipedia.org/wiki/York",
-      "confidence": 5,
-      "lat": 53.9623,
-      "lng": -1.0819,
-      "area_note": "Generated near York Minster and Central York. Review exact relevance to place.",
-      "era": "Roman Britain",
-      "tags": [
-        "york-minster",
-        "york minster and central york",
-        "city in north yorkshire, england",
-        "12th century English pogroms",
-        "1954–55 FA Cup",
-        "1990s UK local government reform",
-        "1st (United Kingdom) Division",
-        "2010 United Kingdom general election",
-        "Q1357964",
-        "Q1549591",
-        "Q7897276",
-        "Q515",
-        "Q42462",
-        "city in North Yorkshire, England, United Kingdom"
-      ],
-      "media": [
-        {
-          "type": "image",
-          "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/York_Minster_%282797690%29.jpg/330px-York_Minster_%282797690%29.jpg",
-          "caption": "York"
-        }
-      ],
-      "review_status": "approved",
-      "origin": "generated",
-      "visibility": "public",
-      "status": "active"
-    },
-    {
-      "id": "candidate-ad558fea-4e43-496d-817b-8e55574da250",
-      "title": "York Deanery",
-      "date_start": "0120-01-01",
-      "date_end": "0400-01-01",
-      "category": "religion",
-      "description": "York Deanery is an historic building in York, England. It has been designated a Grade II listed building by Historic England. The property is located around 400 feet (120 m) to the north of York Minster, on Minster Yard, and behind York Minster Library.",
-      "significance": "Candidate generated from Wikipedia/Wikidata for York Minster and Central York. Review dates, relevance, and classification before import.",
-      "source_url": "https://en.wikipedia.org/wiki/York_Deanery",
-      "confidence": 5,
-      "lat": 53.9623,
-      "lng": -1.0819,
-      "area_note": "Generated near York Minster and Central York. Review exact relevance to place.",
-      "era": "Medieval Britain",
-      "tags": [
-        "york-minster",
-        "york minster and central york",
-        "historic site in york, england",
-        "Ashlar",
-        "Coat of arms",
-        "Dead end (street)",
-        "Dean of York",
-        "Diocese of York",
-        "Q41176",
-        "Q26548625",
-        "Grade II listed building in York, England, UK"
-      ],
-      "media": [
-        {
-          "type": "image",
-          "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2b/Deanery_Minster_Yard_York_02.jpg/330px-Deanery_Minster_Yard_York_02.jpg",
-          "caption": "York Deanery"
-        }
-      ],
-      "review_status": "approved",
-      "origin": "generated",
-      "visibility": "public",
-      "status": "active"
-    },
-    {
-      "id": "candidate-86ba7c60-456e-46a9-9685-b3a5a9ab930a",
-      "title": "Southwell Minster",
-      "date_start": "1201-01-17",
-      "date_end": null,
-      "category": "religion",
-      "description": "Southwell Minster, strictly since 1884 Southwell Cathedral, and formally the Cathedral and Parish Church of the Blessed Virgin Mary, is a Church of England cathedral in Southwell, Nottinghamshire, England. The cathedral is the seat of the bishop of Southwell and Nottingham and the mother church of the diocese of Southwell and Nottingham; it is governed by a dean and chapter. It is a grade I listed building.",
-      "significance": "Candidate generated from Wikipedia/Wikidata for York Minster and Central York. Review dates, relevance, and classification before import.",
-      "source_url": "https://en.wikipedia.org/wiki/Southwell_Minster",
-      "confidence": 5,
-      "lat": 53.9623,
-      "lng": -1.0819,
-      "area_note": "Generated near York Minster and Central York. Review exact relevance to place.",
-      "era": "Medieval Britain",
-      "tags": [
-        "york-minster",
-        "york minster and central york",
-        "church in nottinghamshire, england",
-        "34 & 35 Hen. 8",
-        "A tour thro' the Whole Island of Great Britain",
-        "Albert Seward",
-        "Alison Milbank",
-        "Anglo-Saxon architecture",
-        "Q56242250",
-        "Q3492345",
-        "Grade I listed cathedral in Southwell, United Kingdom"
-      ],
-      "media": [
-        {
-          "type": "image",
-          "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Southwell_Minster_2016_-_north-west_view.jpg/330px-Southwell_Minster_2016_-_north-west_view.jpg",
-          "caption": "Southwell Minster"
-        }
-      ],
-      "review_status": "approved",
-      "origin": "generated",
-      "visibility": "public",
-      "status": "active"
-    },
-    {
-      "id": "candidate-69359357-a107-428d-b2f9-77dfbea1c900",
-      "title": "York Minster",
-      "date_start": "1220-01-17",
-      "date_end": null,
-      "category": "religion",
-      "description": "York Minster, formally the Cathedral and Metropolitical Church of Saint Peter in York, is an Anglican cathedral in the city of York, North Yorkshire, England. The minster is the seat of the archbishop of York, the second-highest office of the Church of England, and is the mother church for the diocese of York and the province of York. It is administered by its dean and chapter. The minster is a Grade I listed building and a scheduled monument.",
-      "significance": "Candidate generated from Wikipedia/Wikidata for York Minster and Central York. Review dates, relevance, and classification before import.",
-      "source_url": "https://en.wikipedia.org/wiki/York_Minster",
-      "confidence": 5,
-      "lat": 53.9623,
-      "lng": -1.0819,
-      "area_note": "Generated near York Minster and Central York. Review exact relevance to place.",
-      "era": "Medieval Britain",
-      "tags": [
-        "york-minster",
-        "york minster and central york",
-        "grade i listed cathedral in england",
-        "A. L. Moore",
-        "Abraham and Bernard van Linge",
-        "Admiral",
-        "Aestheticism",
-        "Alan Richardson (priest)",
-        "Q16970",
-        "Q2977",
-        "Q252575",
-        "cathedral of York, North Yorkshire, England, UK"
-      ],
-      "media": [
-        {
-          "type": "image",
-          "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/York_Minster_%282797690%29.jpg/330px-York_Minster_%282797690%29.jpg",
-          "caption": "York Minster"
-        }
-      ],
-      "review_status": "approved",
-      "origin": "generated",
-      "visibility": "public",
-      "status": "active"
-    },
-    {
-      "id": "candidate-8f3302e3-5774-4947-a6c4-289c3847f99f",
-      "title": "Five Sisters window",
-      "date_start": "1250-01-01",
-      "date_end": "1260-01-01",
-      "category": "religion",
-      "description": "York Minster's Five Sisters window contains the largest expanse of 13th century grisaille glass in the world. It was built c.1250–1260 and is located in the north wall of the north transept of York Minster. The window features in the Guinness Book of Records as \"the largest ancient stained-glass window in the British Isles.\"",
-      "significance": "Candidate generated from Wikipedia/Wikidata for York Minster and Central York. Review dates, relevance, and classification before import.",
-      "source_url": "https://en.wikipedia.org/wiki/Five_Sisters_window",
-      "confidence": 5,
-      "lat": 53.9623,
-      "lng": -1.0819,
-      "area_note": "Generated near York Minster and Central York. Review exact relevance to place.",
-      "era": "Medieval Britain",
-      "tags": [
-        "york-minster",
-        "york minster and central york",
-        "grisaille window in york minster",
-        "Almyra Gray",
-        "Auckland Star",
-        "Australian Army Nursing Service",
-        "Australian Red Cross",
-        "Bell-ringer",
-        "Q4502142",
-        "Q119348747",
-        "five Sisters window, York Minster"
-      ],
-      "media": [
-        {
-          "type": "image",
-          "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/62/York_Minster_window_n16_%22The_Five_sisters%22_%2816157008236%29.jpg/330px-York_Minster_window_n16_%22The_Five_sisters%22_%2816157008236%29.jpg",
-          "caption": "Five Sisters window"
-        }
-      ],
-      "review_status": "approved",
-      "origin": "generated",
-      "visibility": "public",
-      "status": "active"
-    },
-    {
-      "id": "candidate-d4a97271-2247-49b8-b336-8b03ad8a0927",
-      "title": "Archbishop of York",
-      "date_start": "1559-00-00",
-      "date_end": null,
-      "category": "religion",
-      "description": "The archbishop of York is a senior bishop in the Church of England, second only to the archbishop of Canterbury. The archbishop is the diocesan bishop of the Diocese of York and the metropolitan bishop of the province of York, which covers the northern regions of England as well as the Isle of Man.",
-      "significance": "Candidate generated from Wikipedia/Wikidata for York Minster and Central York. Review dates, relevance, and classification before import.",
-      "source_url": "https://en.wikipedia.org/wiki/Archbishop_of_York",
-      "confidence": 5,
-      "lat": 53.9623,
-      "lng": -1.0819,
-      "area_note": "Generated near York Minster and Central York. Review exact relevance to place.",
-      "era": "Early Modern Britain",
-      "tags": [
-        "york-minster",
-        "york minster and central york",
-        "senior bishop in the church of england",
-        "Abbot",
-        "Abbot of Melrose",
-        "Accepted Frewen",
-        "Accord of Winchester",
-        "Alexander Neville (bishop)",
-        "Q124515690",
-        "Q1363910",
-        "senior bishop in the Church of England"
-      ],
-      "media": [
-        {
-          "type": "image",
-          "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Installation_of_the_Bishops_of_Barking_and_Colchester_%2814983891360%29_%28Stephen_Cottrell_cropped%29.jpg/330px-Installation_of_the_Bishops_of_Barking_and_Colchester_%2814983891360%29_%28Stephen_Cottrell_cropped%29.jpg",
-          "caption": "Archbishop of York"
         }
       ],
       "review_status": "approved",

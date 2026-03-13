@@ -837,10 +837,12 @@ export default function PlacePackEditor({ slug }: { slug: string }) {
                   title={`Mini map preview for ${pack?.place.name ?? slug}`}
                   style={{
                     display: "block",
-                    width: "100%",
-                    height: 360,
+                    width: "160%",
+                    height: 420,
                     border: 0,
                     background: "white",
+                    transform: "scale(0.75)",
+                    transformOrigin: "top left",
                   }}
                 />
               ) : (
@@ -856,10 +858,6 @@ export default function PlacePackEditor({ slug }: { slug: string }) {
                   Loading map preview…
                 </div>
               )}
-            </div>
-
-            <div style={{ fontSize: 13, color: "#555", lineHeight: 1.45 }}>
-              This mini map uses the real app map stack through an embedded preview route. It is intentionally lightweight for editing, while still showing the same map behaviour users experience in the main app.
             </div>
           </div>
 
